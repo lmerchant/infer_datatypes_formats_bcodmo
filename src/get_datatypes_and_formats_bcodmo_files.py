@@ -17,6 +17,8 @@
 # }
 # ```
 
+# to speed up, see https://stackoverflow.com/questions/64370739/multiprocessing-pool-much-slower-than-manually-instantiating-multiple-processes
+
 from pathlib import Path
 import re
 import pandas as pd
@@ -52,7 +54,7 @@ import multiprocessing
 #
 
 
-top_data_folder = f"../erddap_data_files_temp5"
+top_data_folder = f"../data"
 
 possible_formats_file = "possible_datetime_formats.txt"
 df_formats = pd.read_fwf(possible_formats_file)
@@ -676,7 +678,7 @@ def process_file(file: Path):
         summary_obj = None
 
     if summary_obj is None:
-        print(f"Error with file {csv_file}")
+        print(f"Error with file, no results inferred {csv_file}")
     else:
         print(f"info obj is \n{summary_obj}")
 
@@ -794,9 +796,13 @@ if __name__ == "__main__":
     # if csv_file.name != '768627_v1_Global_observed_nitrate_d15N.csv':
     #     continue
 
-    file_list = [
-        file for file in file_list if file.name == "2796_v1_inshore_trawl_stations.csv"
-    ]
+    # file_list = [
+    #     file for file in file_list if file.name == "2796_v1_inshore_trawl_stations.csv"
+    # ]
+
+    # print(file_list)
+
+    # print(f"first file is {file_list[0]}")
 
     num_files = len(file_list)
     print(f"num files is {num_files}")
@@ -808,6 +814,8 @@ if __name__ == "__main__":
     file_out_path.unlink(missing_ok=True)
 
     num_cores = multiprocessing.cpu_count()
+
+    print(f"number of cores is {num_cores}")
 
     start_time = time.time()
 
