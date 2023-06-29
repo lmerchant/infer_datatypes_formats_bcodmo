@@ -308,6 +308,8 @@ def get_parameters_summary_obj(
 def check_possible_minus_9s_fill_value(
     col_name: str, minus_9s: list, numeric_values: list
 ) -> int | float | None:
+    fill_value = None
+
     # minus_9s fill takes priority over any string values
     if len(minus_9s):
         found_9s_fill = list(set(minus_9s))
@@ -315,13 +317,11 @@ def check_possible_minus_9s_fill_value(
 
         # Don't set as a fill value if there are multiple versions of a minus_9s fill
         if len(found_9s_fill) == 1:
-            fill_value = found_9s_fill[0]
+            found_fill = found_9s_fill[0]
         else:
-            fill_value = None
+            found_fill = None
 
-        if fill_value:
-            found_fill = fill_value
-
+        if found_fill is not None:
             negative_numeric_values = [
                 val
                 for val in numeric_values
@@ -329,12 +329,17 @@ def check_possible_minus_9s_fill_value(
             ]
 
             if len(negative_numeric_values):
+                # Until check for larger value than possible for negative values,
+                # don't include a minus_9s fill for negative numeric values
                 print(
                     f"Fill value found in negative list of col values other than fill"
                 )
+                fill_value = None
+            else:
+                fill_value = found_fill
 
-    else:
-        fill_value = None
+        else:
+            fill_value = None
 
     return fill_value
 
