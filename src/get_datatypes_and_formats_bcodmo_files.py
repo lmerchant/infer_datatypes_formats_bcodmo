@@ -24,6 +24,11 @@
 # TODO
 # Add logging
 
+# TODO
+# If a column is all fill values, (not -999, or -999.99 int or float fill), the datatype is 'string' at the moment
+# If a column is all NaN, the datatype is "isnan" at the moment, but should be 'NaN'
+
+
 from pathlib import Path
 import re
 import pandas as pd
@@ -76,7 +81,7 @@ datetime_formats_to_match = df_formats["datetime_formats"].tolist()
 def get_possible_fill_values() -> list:
     possible_fill_values = ["nd", "ND"]
 
-    # Could also be NA, but this can also stand for sodium
+    # additional_nan_fills = ["n.d.", "n.a.", "N/A", "NA", "na", "n/a"]
     additional_nan_fills = ["n.d.", "n.a.", "N/A", "na", "n/a"]
 
     possible_fill_values.extend(additional_nan_fills)
@@ -332,7 +337,7 @@ def check_possible_minus_9s_fill_value(
                 # Until check for larger value than possible for negative values,
                 # don't include a minus_9s fill for negative numeric values
                 print(
-                    f"Fill value found in negative list of col values other than fill"
+                    f"Fill value found in negative list of {col_name} col values other than fill"
                 )
                 fill_value = None
             else:
@@ -723,11 +728,11 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
 
         unique_datatypes = [elem for elem in unique_datatypes if elem]
 
+        # If there is a data type along with NaN values, don't inlcude the
+        # NaN values when determining the data type
         if len(unique_datatypes) > 1 and "isnan" in unique_datatypes:
             unique_datatypes.remove("isnan")
 
-        # TODO
-        # should I leave this in in case all values are a fill value?
         if len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
             unique_datatypes.remove("isfill")
 
@@ -740,6 +745,13 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
             and "datetime" not in unique_datatypes
         ):
             unique_datatypes = ["float"]
+
+        if (
+            "integer" in unique_datatypes
+            and "float" not in unique_datatypes
+            and "datetime" not in unique_datatypes
+        ):
+            unique_datatypes = ["integer"]
 
         if "string" in unique_datatypes:
             unique_datatypes = ["string"]
@@ -1054,6 +1066,9 @@ def process_file(file: Path):
 
     results, final_results = get_parameters_datatypes_dateformats(csv_file)
 
+    # TODO
+    # This should be moved above getting final results so as to include new fill information
+    # Or maybe not if most times a possible fill is a string and not a numeric fill
     if final_results:
         found_fill_values = find_fill_values(results, final_results)
 
@@ -1227,6 +1242,17 @@ if __name__ == "__main__":
     #     for file in file_list
     #     if file.name
     #     == "658275_v1_Mapping_information_and_signs_for_individual_diseased_corals.csv"
+    # ]
+
+    # for file 753036_v1_Lipid_Dendraster_OA_Expt2017.csv, the data type is 'string' for param stomach_area, but there
+    # are float values along with a 'NA' fill. Why is it not float as a final data type? Because the param lipid_area also
+    # has float values and a fill of 'NA', but it is listed as a float type.
+    # Must be a logic error if find string, then all is a string, but if NA is a fill, it's
+    # not a string
+    # file_list = [
+    #     file
+    #     for file in file_list
+    #     if file.name == "753036_v1_Lipid_Dendraster_OA_Expt2017.csv"
     # ]
 
     num_files = len(file_list)
