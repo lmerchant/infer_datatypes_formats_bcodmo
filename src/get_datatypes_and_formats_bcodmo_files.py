@@ -650,34 +650,35 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
         and "%m/%d/%Y" in unique_formats
         and len(unique_formats) == 2
     ):
-        col_pos_01 = []
-        col_pos_34 = []
+        first_piece = []
+        second_piece = []
 
         for val in col_vals:
+            pieces = val.split("/")
             try:
-                col_pos_01.append(int(val[0:2]))
-                col_pos_34.append(int(val[3:5]))
+                first_piece.append(int(pieces[0]))
+                second_piece.append(int(pieces[1]))
             except:
                 pass
 
-        # check if col_pos_01 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_01 if val > 12]
+        # check if first_piece > 12. Then it's definitely a day
+        vals = [val for val in first_piece if val > 12]
         if len(vals):
-            is_day_col_pos_01 = True
+            is_day_first_piece = True
         else:
-            is_day_col_pos_01 = False
+            is_day_first_piece = False
 
-        # check if col_pos_34 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_34 if val > 12]
+        # check if second_piece > 12. Then it's definitely a day
+        vals = [val for val in second_piece if val > 12]
         if len(vals):
-            is_day_col_pos_34 = True
+            is_day_second_piece = True
         else:
-            is_day_col_pos_34 = False
+            is_day_second_piece = False
 
-        if is_day_col_pos_01:
+        if is_day_first_piece:
             out_format = "%d/%m/%Y"
 
-        elif is_day_col_pos_34:
+        elif is_day_second_piece:
             out_format = "%m/%d/%Y"
 
         else:
@@ -694,34 +695,35 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
         and "%m-%d-%Y" in unique_formats
         and len(unique_formats) == 2
     ):
-        col_pos_01 = []
-        col_pos_34 = []
+        first_piece = []
+        second_piece = []
 
         for val in col_vals:
+            pieces = val.split("-")
             try:
-                col_pos_01.append(int(val[0:2]))
-                col_pos_34.append(int(val[3:5]))
+                first_piece.append(int(pieces[0]))
+                second_piece.append(int(pieces[1]))
             except:
                 pass
 
-        # check if col_pos_01 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_01 if val > 12]
+        # check if first_piece > 12. Then it's definitely a day
+        vals = [val for val in first_piece if val > 12]
         if len(vals):
-            is_day_col_pos_01 = True
+            is_day_first_piece = True
         else:
-            is_day_col_pos_01 = False
+            is_day_first_piece = False
 
-        # check if col_pos_34 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_34 if val > 12]
+        # check if second_piece > 12. Then it's definitely a day
+        vals = [val for val in second_piece if val > 12]
         if len(vals):
-            is_day_col_pos_34 = True
+            is_day_second_piece = True
         else:
-            is_day_col_pos_34 = False
+            is_day_second_piece = False
 
-        if is_day_col_pos_01:
+        if is_day_first_piece:
             out_format = "%d/%m/%Y"
 
-        elif is_day_col_pos_34:
+        elif is_day_second_piece:
             out_format = "%m/%d/%Y"
 
         else:
@@ -735,39 +737,41 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
         out_formats = [out_format]
 
     # Check various date forms
+    # Here assume 0 padding
     if (
         "%d%m%Y" in unique_formats
         and "%m%d%Y" in unique_formats
         and len(unique_formats) == 2
     ):
-        col_pos_01 = []
-        col_pos_23 = []
+        first_piece = []
+        second_piece = []
 
         for val in col_vals:
-            try:
-                col_pos_01.append(int(val[0:2]))
-                col_pos_23.append(int(val[2:4]))
-            except:
-                pass
+            if len(val) == 8:
+                try:
+                    first_piece.append(int(val[0:2]))
+                    second_piece.append(int(val[2:4]))
+                except:
+                    pass
 
-        # check if col_pos_01 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_01 if val > 12]
+        # check if first_piece > 12. Then it's definitely a day
+        vals = [val for val in first_piece if val > 12]
         if len(vals):
-            is_day_col_pos_01 = True
+            is_day_first_piece = True
         else:
-            is_day_col_pos_01 = False
+            is_day_first_piece = False
 
-        # check if col_pos_23 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_23 if val > 12]
+        # check if second_piece > 12. Then it's definitely a day
+        vals = [val for val in second_piece if val > 12]
         if len(vals):
-            is_day_col_pos_23 = True
+            is_day_second_piece = True
         else:
-            is_day_col_pos_23 = False
+            is_day_second_piece = False
 
-        if is_day_col_pos_01:
+        if is_day_first_piece:
             out_format = "%d%m%Y"
 
-        elif is_day_col_pos_23:
+        elif is_day_second_piece:
             out_format = "%m%d%Y"
 
         else:
@@ -779,20 +783,25 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
             out_formats = [out_format]
 
     # Check various date forms
+    # Assume 0 padding
     if (
         "%Y%m%d" in unique_formats
         and "%m%d%Y" in unique_formats
         and len(unique_formats) == 2
     ):
+        # 1st 4 chars to possibly be a year
         col_pos_03 = []
+
+        # last 4 chars to possibly be a year
         col_pos_47 = []
 
         for val in col_vals:
-            try:
-                col_pos_03.append(int(val[0:4]))
-                col_pos_47.append(int(val[4:]))
-            except:
-                pass
+            if len(val) == 8:
+                try:
+                    col_pos_03.append(int(val[0:4]))
+                    col_pos_47.append(int(val[4:]))
+                except:
+                    pass
 
         # check if col_pos_03 is bigger than 1231 which is either month > 12 or day > 31
         # then it's definitely a year
@@ -830,34 +839,35 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
         and "%m/%d/%y" in unique_formats
         and len(unique_formats) == 2
     ):
-        col_pos_01 = []
-        col_pos_34 = []
+        first_piece = []
+        second_piece = []
 
         for val in col_vals:
+            pieces = val.split("/")
             try:
-                col_pos_01.append(int(val[0:2]))
-                col_pos_34.append(int(val[3:5]))
+                first_piece.append(int(pieces[0]))
+                second_piece.append(int(pieces[1]))
             except:
                 pass
 
-        # check if col_pos_01 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_01 if val > 12]
+        # check if first_piece > 12. Then it's definitely a day
+        vals = [val for val in first_piece if val > 12]
         if len(vals):
-            is_day_col_pos_01 = True
+            is_day_first_piece = True
         else:
-            is_day_col_pos_01 = False
+            is_day_first_piece = False
 
-        # check if col_pos_34 > 12. Then it's definitely a day
-        vals = [val for val in col_pos_34 if val > 12]
+        # check if second_piece > 12. Then it's definitely a day
+        vals = [val for val in second_piece if val > 12]
         if len(vals):
-            is_day_col_pos_34 = True
+            is_day_second_piece = True
         else:
-            is_day_col_pos_34 = False
+            is_day_second_piece = False
 
-        if is_day_col_pos_01:
+        if is_day_first_piece:
             out_format = "%d/%m/%y"
 
-        elif is_day_col_pos_34:
+        elif is_day_second_piece:
             out_format = "%m/%d/%y"
 
         else:
@@ -881,11 +891,11 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
     # Check various time formats
     # "%H%M" and "%H%M.%f"
     if (
-        "%H:%M" in unique_formats
-        and "%H:%M.%f" in unique_formats
+        "%H%M" in unique_formats
+        and "%H%M.%f" in unique_formats
         and len(unique_formats) == 2
     ):
-        out_format = "%H:%M.%f"
+        out_format = "%H%M.%f"
         out_formats = [out_format]
 
     return out_formats
@@ -1514,6 +1524,16 @@ def main():
     #     "type": "integer",
     #     "fill_value": "test2-stn01"
     # }
+
+    # see 749412_v1_Geltrap_micrographs.csv
+    # Not fine tuning date. Looking at file, it should be %m/%d/%y
+    # "Deploy_Date_UTC": [
+    #     "%m/%d/%y",
+    #     "%d/%m/%y"
+    # ],
+    # file_list = [
+    #     file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
+    # ]
 
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
