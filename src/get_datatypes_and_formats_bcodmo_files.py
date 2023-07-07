@@ -90,7 +90,9 @@ df_formats = pd.read_fwf(possible_formats_file)
 datetime_formats_to_match = df_formats["datetime_formats"].tolist()
 
 
-# List of possible nan types in BCO-DMO data files
+# List of possible fill types in BCO-DMO data files
+# I've treated any NaN values as np.NaN to ignore in determining the
+# datatype of a column
 def get_possible_fill_values() -> list:
     # TODO
     # Find out if "bd" counts as a fill value (means below detection)
@@ -1046,6 +1048,9 @@ def get_parameter_datatypes_fill(
     for i in range(len(col_vals)):
         col_val = col_vals[i]
 
+        # Remove any spaces that a column value might have
+        col_val = col_val.strip()
+
         if name_in_bcodmo_datetimes:
             is_datetime = True
 
@@ -1534,6 +1539,26 @@ def main():
     # file_list = [
     #     file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
     # ]
+
+    # see 3911_v1_CTD_Profiles,csv
+    # Check why format can't be determined
+    # "Time_Local": {
+    #     "type": "date",
+    #     "format": [
+    #         "%Y%m%d",
+    #         "%y%m%d",
+    #         "%m%d%y",
+    #         "%m%d%Y"
+    #     ]
+    # }
+    # has values: 155231, 170025, 60658, 224852
+    # why is %Y%m%d even selected if char length is 6 or less,
+    # should be 8 according to %m%d%Y
+    #
+    # TODO
+    # Have choice of setting datatype back to string and format to None if have
+    # more than one format to choose from
+    # file_list = [file for file in file_list if file.name == "3911_v1_CTD_Profiles.csv"]
 
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
