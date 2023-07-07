@@ -82,7 +82,7 @@ top_data_folder = f"../data"
 logging_dir = "../logs"
 
 log_errors = "../logs/log_files_with_errors_opening.txt"
-parameter_summary = "../logs/parameters_summary.txt"
+parameters_overview = "../logs/parameters_overview.txt"
 log_encodings_not_utf8 = "log_file_no_utf8_encoding.txt"
 
 possible_formats_file = "possible_datetime_formats.txt"
@@ -192,8 +192,8 @@ def get_official_name(param_name: str, parameter_official_names: dict) -> str | 
 
 # TODO
 # call this a logging output
-def save_parameters_summary(csv_file: str, final_results: dict):
-    parameter_summary = "../logs/parameters_summary.txt"
+def save_parameters_overview(csv_file: str, final_results: dict):
+    parameters_overview = "../logs/parameters_overview.txt"
 
     # Get one line of parameter values to see sample values
     values = {}
@@ -228,7 +228,7 @@ def save_parameters_summary(csv_file: str, final_results: dict):
 
         alt_fill_values = {key: val for key, val in alt_fill_values.items() if val}
 
-    with open(parameter_summary, "a") as f:
+    with open(parameters_overview, "a") as f:
         f.write(f"**********************\n")
         f.write(f"file: {csv_file}\n")
         f.write(f"**********************\n")
@@ -250,7 +250,7 @@ def save_parameters_summary(csv_file: str, final_results: dict):
 def write_parameters_final_results(csv_file: str, final_results: dict):
     filename = Path(csv_file).name
 
-    final_results_file = "../output/final_results_file.txt"
+    parameters_summary_file = "../output/parameters_summary.txt"
 
     parameter_names_from_file = final_results.keys()
 
@@ -336,7 +336,7 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
 
     final_str = json_object + "\n,"
 
-    with open(final_results_file, "a") as f:
+    with open(parameters_summary_file, "a") as f:
         f.write(final_str)
 
 
@@ -366,11 +366,11 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
 #     # For each parameter, create columns entry with datatype and formats just for datetime parameters
 #     filename = Path(csv_file).name
 
-#     final_results_file = "final_results_file.txt"
+#     parameters_summary_file = "parameters_summary.txt"
 
 #     parameter_names_from_file = final_results.keys()
 
-#     with open(final_results_file, "w") as f:
+#     with open(parameters_summary_file, "w") as f:
 #         f.write("{")
 
 #         f.write(f'"source": "{csv_file}",')
@@ -1337,14 +1337,14 @@ def process_file(file: Path):
     final_results = get_final_params_datatypes_formats_fill(csv_file)
 
     if final_results is not None:
-        save_parameters_summary(csv_file, final_results)
+        save_parameters_overview(csv_file, final_results)
 
         write_parameters_final_results(csv_file, final_results)
 
 
 def main():
-    parameter_summary_path = Path(parameter_summary)
-    parameter_summary_path.unlink(missing_ok=True)
+    parameters_overview_path = Path(parameters_overview)
+    parameters_overview_path.unlink(missing_ok=True)
 
     log_errors_path = Path(log_errors)
     log_errors_path.unlink(missing_ok=True)
@@ -1355,9 +1355,9 @@ def main():
     # Remove summary file that holds the program output of datatypes and formats
     # for each file
     os.makedirs("../output", exist_ok=True)
-    final_results_file = "../output/final_results_file.txt"
+    parameters_summary_file = "../output/parameters_summary.txt"
     try:
-        os.remove(final_results_file)
+        os.remove(parameters_summary_file)
     except OSError as e:
         if e.errno != errno.ENOENT:  # errno.ENOENT = no such file or directory
             raise  # re-raise exception if a different error occurred
@@ -1491,12 +1491,12 @@ def main():
     #     "type": "string",
     #     "fill_value": "bd"
     # }
-    file_list = [
-        file
-        for file in file_list
-        if file.name
-        == "644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv"
-    ]
+    # file_list = [
+    #     file
+    #     for file in file_list
+    #     if file.name
+    #     == "644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv"
+    # ]
 
     # see 815092_v1_Wrack_Composition_and_Abundance.csv
     # If type is string, don't look for a fill because it could stand
@@ -1509,7 +1509,7 @@ def main():
     # see 652223_v1_MUSiCC_OC1504A___Bacteria_Virus_and_Chlorophyll_Containing_Cell_Abundance.csv
     # if have a fill_value that is not one of possible fill values or minus 9s
     # and datatype is not a string
-    # save it to dict as "alt_fill_value" and save to log parameters_summary.txt
+    # save it to dict as "alt_fill_value" and save to log parameters_overview.txt
     # "station": {
     #     "type": "integer",
     #     "fill_value": "test2-stn01"
@@ -1518,8 +1518,8 @@ def main():
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
 
-    parameter_summary_path = Path(parameter_summary)
-    parameter_summary_path.unlink(missing_ok=True)
+    parameters_overview_path = Path(parameters_overview)
+    parameters_overview_path.unlink(missing_ok=True)
 
     log_errors_path = Path(log_errors)
     log_errors_path.unlink(missing_ok=True)
@@ -1536,7 +1536,7 @@ def main():
         pool.map(process_file, file_list)
 
     # Add [] to summary file of dicts of datatypes and formats
-    with open(final_results_file, "r") as f:
+    with open(parameters_summary_file, "r") as f:
         summary = f.read()
 
     # strip last ','
@@ -1544,7 +1544,7 @@ def main():
 
     final_str = f"[{summary}]"
 
-    with open(final_results_file, "w") as f:
+    with open(parameters_summary_file, "w") as f:
         f.write(final_str)
 
     end_time = time.time()
