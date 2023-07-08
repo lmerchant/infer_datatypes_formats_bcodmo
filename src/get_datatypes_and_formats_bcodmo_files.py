@@ -75,7 +75,7 @@ import errno
 # or create a def with filenames and get names wherever
 
 # TODO
-# add 'fill' value to the final output file
+# if whole column a 'fill' value, determine if it is a string, integer or float fill
 
 top_data_folder = f"../data"
 
@@ -211,19 +211,25 @@ def save_parameters_overview(csv_file: str, final_results: dict):
             alt_fill_values[col_name] = final_results[col_name]["alt_fill_value"]
 
             final_parameters_datetime_formats[col_name] = final_results[col_name][
-                "unique_formats"
+                "final_format"
             ]
             final_parameters_datatypes[col_name] = final_results[col_name][
-                "unique_datatypes"
+                "final_datatype"
             ]
 
             col_values = val["col_values"]
             values[col_name] = col_values[0]
 
+        # final_parameters_datetime_formats = {
+        #     key: values
+        #     for key, values in final_parameters_datetime_formats.items()
+        #     if not all(val is None for val in values)
+        # }
+
         final_parameters_datetime_formats = {
-            key: values
-            for key, values in final_parameters_datetime_formats.items()
-            if not all(val is None for val in values)
+            key: value
+            for key, value in final_parameters_datetime_formats.items()
+            if value
         }
 
         fill_values = {key: val for key, val in fill_values.items() if val}
@@ -268,28 +274,26 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
         # "cruiseid": {"type": "string"},
 
         try:
-            datatypes = final_results[parameter_col_name]
-            unique_datatypes = datatypes["unique_datatypes"]
+            final_datatype = final_results[parameter_col_name]["final_datatype"]
         except:
             print(f"Error reading in {parameter_col_name} in file {csv_file}")
             continue
 
-        # Datatypes
-        col_not_null_datatypes = [val for val in unique_datatypes if val]
+        # # Datatypes
+        # col_not_null_datatypes = [val for val in unique_datatypes if val]
 
-        if not col_not_null_datatypes:
-            final_datatypes = None
+        # if not col_not_null_datatypes:
+        #     final_datatypes = None
 
-        elif len(col_not_null_datatypes) == 1:
-            final_datatypes = col_not_null_datatypes[0]
+        # elif len(col_not_null_datatypes) == 1:
+        #     final_datatypes = col_not_null_datatypes[0]
 
-        else:
-            final_datatypes = col_not_null_datatypes
+        # else:
+        #     final_datatypes = col_not_null_datatypes
 
         # Formats
         try:
-            formats = final_results[parameter_col_name]
-            unique_formats = formats["unique_formats"]
+            final_format = final_results[parameter_col_name]["final_format"]
 
         except KeyError:
             print(
@@ -297,16 +301,16 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
             )
             continue
 
-        col_not_null_formats = [val for val in unique_formats if val]
+        # col_not_null_formats = [val for val in unique_formats if val]
 
-        if not col_not_null_formats:
-            final_formats = None
+        # if not col_not_null_formats:
+        #     final_formats = None
 
-        elif len(col_not_null_formats) == 1:
-            final_formats = col_not_null_formats[0]
+        # elif len(col_not_null_formats) == 1:
+        #     final_formats = col_not_null_formats[0]
 
-        else:
-            final_formats = col_not_null_formats
+        # else:
+        #     final_formats = col_not_null_formats
 
         # Fill values
         try:
@@ -322,10 +326,10 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
         # Parameter Object composed of datatype, format and fill value
         param_obj[parameter_col_name] = {}
 
-        param_obj[parameter_col_name]["type"] = final_datatypes
+        param_obj[parameter_col_name]["type"] = final_datatype
 
-        if final_formats is not None:
-            param_obj[parameter_col_name]["format"] = final_formats
+        if final_format is not None:
+            param_obj[parameter_col_name]["format"] = final_format
 
         if final_fill_value is not None:
             param_obj[parameter_col_name]["fill_value"] = final_fill_value
@@ -394,7 +398,7 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
 #             # but for final output, want the official name?
 
 #             try:
-#                 datatypes = final_results[parameter_col_name]["unique_datatypes"]
+#                 datatypes = final_results[parameter_col_name]["final_datatype"]
 #             except:
 #                 print(f"Error reading in {parameter_col_name} in file {csv_file}")
 #                 continue
@@ -642,6 +646,84 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
     return fill_values, alt_fill_values
 
 
+def get_parameter_final_datatype(unique_datatypes):
+    print(f"inside get_parameter_final_datatype")
+    print(f"starting unique datatypes are {unique_datatypes}")
+
+    # If there is a datatype along with NaN values, don't inlcude the
+    # NaN values when determining the data type
+    final_datatype = None
+
+    if "isnan" in unique_datatypes:
+        unique_datatypes.remove("isnan")
+        if not len(unique_datatypes):
+            final_datatype = None
+
+    # If there is a fill datatype, remove it to determine the datatype of remaining
+    if len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
+        unique_datatypes.remove("isfill")
+    elif len(unique_datatypes) == 1 and "isfill" in unique_datatypes:
+        # All values are fill. Figure out later what type the fill value is
+        final_datatype = "fill"
+
+    if len(unique_datatypes) == 1:
+        final_datatype = unique_datatypes[0]
+
+    else:
+        if (
+            "float" in unique_datatypes
+            and "integer" in unique_datatypes
+            and "datetime" not in unique_datatypes
+        ):
+            final_datatype = "float"
+
+        if (
+            "float" in unique_datatypes
+            and "integer" not in unique_datatypes
+            and "datetime" not in unique_datatypes
+        ):
+            final_datatype = "float"
+
+        if (
+            "integer" in unique_datatypes
+            and "float" not in unique_datatypes
+            and "datetime" not in unique_datatypes
+        ):
+            final_datatype = "integer"
+
+        # if more than one datetime datatype (like date and time and datetime), generalize it to datetime
+        if (
+            "datetime" in unique_datatypes
+            or "time" in unique_datatypes
+            or "date" in unique_datatypes
+            and "integer" not in unique_datatypes
+            and "float" not in unique_datatypes
+            and "string" not in unique_datatypes
+        ):
+            final_datatype = "datetime"
+
+        # if (
+        #     "date" in unique_datatypes
+        #     and "integer" not in unique_datatypes
+        #     and "float" not in unique_datatypes
+        #     and "string" not in unique_datatypes
+        # ):
+        #     final_datatype = "date"
+
+        # if (
+        #     "time" in unique_datatypes
+        #     and "integer" not in unique_datatypes
+        #     and "float" not in unique_datatypes
+        #     and "string" not in unique_datatypes
+        # ):
+        #     final_datatype = "time"
+
+        if "string" in unique_datatypes:
+            final_datatype = "string"
+
+    return final_datatype
+
+
 def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
     out_formats = unique_formats
 
@@ -852,6 +934,9 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
             except:
                 pass
 
+        print(f"first pieces are {first_piece}")
+        print(f"second pieces are {second_piece}")
+
         # check if first_piece > 12. Then it's definitely a day
         vals = [val for val in first_piece if val > 12]
         if len(vals):
@@ -865,6 +950,9 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
             is_day_second_piece = True
         else:
             is_day_second_piece = False
+
+        print(f"is_day_first_piece {is_day_first_piece}")
+        print(f"is_day_second_piece {is_day_second_piece}")
 
         if is_day_first_piece:
             out_format = "%d/%m/%y"
@@ -903,6 +991,130 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
     return out_formats
 
 
+def find_datatypes_from_formats(unique_formats):
+    # If there are multiple datetime formats, a format can't be determined,
+    # so the datatype will not be a datetime
+    # Now determine the datatype if it's not a datetime
+
+    # Replace % in format with '' and then check if there is one decimal point
+    # to determine if it's an integer or float. But if there are extra characters
+    # like ":", call it a string.
+
+    print("inside find_datatypes_from_formats")
+
+    new_datatypes = []
+    for format in unique_formats:
+        bare_format = format.replace("%", "")
+
+        non_alpha_chars = []
+        for character in bare_format:
+            if not character.isalpha():
+                non_alpha_chars.append(character)
+
+        if bare_format.isalpha():
+            datatype = "integer"
+        elif "." in non_alpha_chars:
+            # Find number of chars if one period removed
+            num_chars = len(non_alpha_chars) - 1
+
+            # Check if any chars left, and if they are, the datatype is not a float
+            if num_chars:
+                datatype = "string"
+            else:
+                datatype = "float"
+        else:
+            datatype = "string"
+
+        new_datatypes.append(datatype)
+
+    # Now get unique datatypes. If they are different, the datatype is a string
+    unique_datatypes = list(set(new_datatypes))
+
+    print(f"unique datatypes at end are {unique_datatypes}")
+
+    return unique_datatypes
+
+
+def get_parameter_unique_datatypes(
+    col_values,
+    datatypes,
+    parameter_formats,
+    time_format_letters,
+    date_format_letters,
+    name_in_bcodmo_datetimes,
+):
+    new_datatypes = []
+
+    for i in range(len(datatypes)):
+        elem_datatype = datatypes[i]
+        elem_format = parameter_formats[i]
+        col_val = col_values[i]
+
+        print(f"elem index {i} datatype {elem_datatype} and format {elem_format}")
+
+        if elem_format is not None and elem_datatype == "datetime":
+            datatype_letters = re.split(r"[^a-zA-Z]*", elem_format)
+
+            common_time_letters = list(set(time_format_letters) & set(datatype_letters))
+
+            common_date_letters = list(set(date_format_letters) & set(datatype_letters))
+
+            if (
+                common_time_letters
+                and not common_date_letters
+                and name_in_bcodmo_datetimes
+            ):
+                elem_datatype = "time"
+
+            elif (
+                not common_time_letters
+                and common_date_letters
+                and name_in_bcodmo_datetimes
+            ):
+                elem_datatype = "date"
+
+            else:
+                elem_datatype = "datetime"
+
+            new_datatypes.append(elem_datatype)
+
+        elif elem_format is None and elem_datatype == "datetime":
+            # keep datatype datetime and if format = None,
+            # go through list of options to find the datatype
+            # Would need the col value to do this
+
+            possible_fill_values = get_possible_fill_values()
+
+            if col_val in possible_fill_values:
+                datatype = "isfill"
+            else:
+                try:
+                    val_float = float(col_val)
+
+                    if math.isnan(val_float):
+                        datatype = "isnan"
+                    elif "." not in col_val:
+                        datatype = "integer"
+                    else:
+                        datatype = "float"
+                except:
+                    datatype = "string"
+
+                print("elem format None and datatype is datetime")
+                print(f"final datatype is {datatype}")
+
+            new_datatypes.append(datatype)
+
+        else:
+            new_datatypes.append(elem_datatype)
+
+    unique_datatypes = list(set(new_datatypes))
+
+    unique_datatypes = [elem for elem in unique_datatypes if elem]
+
+    return unique_datatypes
+
+
 def get_final_results(results: dict, parameter_official_names: dict) -> dict:
     # Refine datetime to be time, date, or datetime
 
@@ -918,6 +1130,8 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
     final_results = {}
 
     for col_name in column_names:
+        print(f"parm {col_name}")
+
         final_results[col_name] = {}
 
         col_values = results[col_name]["col_values"]
@@ -926,6 +1140,8 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         final_results[col_name]["possible_fill"] = results[col_name]["possible_fill"]
 
         datatypes = results[col_name]["col_datatypes"]
+
+        print(f"before datatypes are {datatypes}")
 
         # Fine tune whether a datetime type is date, time, or datetime
         # Need to know what the format looks like,
@@ -940,83 +1156,28 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
 
         parameter_formats = results[col_name]["col_formats"]
 
-        parameter_formats = [item for sublist in parameter_formats for item in sublist]
+        # parameter_formats = [item for sublist in parameter_formats for item in sublist]
 
-        new_datatypes = []
+        print(f"before formats are {parameter_formats}")
 
-        for i in range(len(datatypes)):
-            elem_datatype = datatypes[i]
-            elem_format = parameter_formats[i]
+        # Find unique datatypes from looking at each parameter datatype and format
+        # unique_datatypes may be None if the format for a value is None but has a datetime datatype
+        # Will analyze this None datatype later to determine it
 
-            if elem_format is not None and elem_datatype == "datetime":
-                datatype_letters = re.split(r"[^a-zA-Z]*", elem_format)
+        # TODO, change this behavior to keep datatype datetime and if format = None,
+        # go through list of options to find the datatype
 
-                common_time_letters = list(
-                    set(time_format_letters) & set(datatype_letters)
-                )
+        unique_datatypes = get_parameter_unique_datatypes(
+            col_values,
+            datatypes,
+            parameter_formats,
+            time_format_letters,
+            date_format_letters,
+            name_in_bcodmo_datetimes,
+        )
 
-                common_date_letters = list(
-                    set(date_format_letters) & set(datatype_letters)
-                )
-
-                if (
-                    common_time_letters
-                    and not common_date_letters
-                    and name_in_bcodmo_datetimes
-                ):
-                    elem_datatype = "time"
-
-                elif (
-                    not common_time_letters
-                    and common_date_letters
-                    and name_in_bcodmo_datetimes
-                ):
-                    elem_datatype = "date"
-
-                else:
-                    elem_datatype = "datetime"
-
-                new_datatypes.append(elem_datatype)
-
-            elif elem_format is None and elem_datatype == "datetime":
-                new_datatypes.append(None)
-
-            else:
-                new_datatypes.append(elem_datatype)
-
-        unique_datatypes = list(set(new_datatypes))
-
-        unique_datatypes = [elem for elem in unique_datatypes if elem]
-
-        # If there is a data type along with NaN values, don't inlcude the
-        # NaN values when determining the data type
-        if len(unique_datatypes) > 1 and "isnan" in unique_datatypes:
-            unique_datatypes.remove("isnan")
-
-        if len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
-            unique_datatypes.remove("isfill")
-
-        if not len(unique_datatypes):
-            unique_datatypes = [None]
-
-        if (
-            "float" in unique_datatypes
-            and "integer" in unique_datatypes
-            and "datetime" not in unique_datatypes
-        ):
-            unique_datatypes = ["float"]
-
-        if (
-            "integer" in unique_datatypes
-            and "float" not in unique_datatypes
-            and "datetime" not in unique_datatypes
-        ):
-            unique_datatypes = ["integer"]
-
-        if "string" in unique_datatypes:
-            unique_datatypes = ["string"]
-
-        final_results[col_name]["unique_datatypes"] = unique_datatypes
+        print("unique datatypes")
+        print(unique_datatypes)
 
         # Get unique parameter formats and fine-tune
         if len(parameter_formats):
@@ -1029,9 +1190,35 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
             unique_formats = [None]
 
         # If more than one format, see if can fine-tune to one best format
-        unique_formats = fine_tune_formats(col_values, unique_formats)
+        if len(unique_formats):
+            unique_formats = fine_tune_formats(col_values, unique_formats)
 
-        final_results[col_name]["unique_formats"] = unique_formats
+        print(f"after fine tune formats")
+        print(unique_formats)
+
+        # If there are still more than one unique_format even after fine tuning,
+        # set the unique_format to None and change the datatype to an integer, float, or string
+        # depending on the formats.
+        # A case is when a time parameter is of the form HHMMSS but is indistinguishable from
+        # multiple date formats. For example, it could have both formats "%Y%m%d" and "%m%d%Y".
+        # Since 'time' is in the parameter name, it should not be a date format but a time format.
+
+        final_format = None
+
+        if len(unique_formats) > 1:
+            unique_datatypes = find_datatypes_from_formats(unique_formats)
+            final_format = None
+
+        elif len(unique_formats) == 1:
+            final_format = unique_formats[0]
+
+        final_results[col_name]["final_format"] = final_format
+
+        final_datatype = get_parameter_final_datatype(unique_datatypes)
+
+        print(f"final datatype is {final_datatype}")
+
+        final_results[col_name]["final_datatype"] = final_datatype
 
     return final_results
 
@@ -1076,6 +1263,8 @@ def get_parameter_datatypes_fill(
                         datatype = "float"
                 except:
                     datatype = "string"
+
+        print(datatype)
 
         parameter_datatypes.append(datatype)
 
@@ -1124,6 +1313,8 @@ def get_parameters_datetime_formats(
 
         result.append(new_formats)
 
+    result = [item for sublist in result for item in sublist]
+
     return result
 
 
@@ -1152,6 +1343,8 @@ def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
     results = {}
 
     for col_name in column_names:
+        print(f"param {col_name}")
+
         results[col_name] = {}
 
         column = df_new[col_name].copy()
@@ -1165,6 +1358,16 @@ def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
         parameter_datetime_formats = get_parameters_datetime_formats(
             col_vals, is_name_in_bcodmo_datetime_vars
         )
+
+        print(f"parameter_datetime_formats {parameter_datetime_formats}")
+
+        # parameter_datetime_formats = [
+        #     item for sublist in parameter_datetime_formats for item in sublist
+        # ]
+
+        # TODO
+        # If parameter_datetime_formats is just None values, write to file
+        # because most likely that format is not in the list of datetime formats to look at
 
         parameters_datatypes, fill_value = get_parameter_datatypes_fill(
             col_vals, is_name_in_bcodmo_datetime_vars
@@ -1536,9 +1739,9 @@ def main():
     #     "%m/%d/%y",
     #     "%d/%m/%y"
     # ],
-    # file_list = [
-    #     file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
-    # ]
+    file_list = [
+        file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
+    ]
 
     # see 3911_v1_CTD_Profiles,csv
     # Check why format can't be determined
