@@ -1,31 +1,82 @@
-# Create JSON information files
+"""
 
-# Sample JSON information file looks like this
+This program determines the datatype, datetime format, and fill value of parameters read in from a CSV data file. There are two files created. One is a log file, parameters_overview.txt, and the other is an output file, parameters_summary.json. The output file is an array of JSON objects of the form
+
+{
+    "source": <full path of file>,
+    "filename": <base filename>,
+    "columns": [
+        {<column name>: {"type": <data type>, "format": <datetime format>, "fill_value": <fill value>}},
+        ...
+    ]
+}
+
+where type is always given, but format and fill_value only appear if these values exist for a parameter column.
+
+The CSV data files are read in as strings to a pandas dataframe to analyze values to prevent pandas from typecasting. This is to prevent a fill value or NaN value from turning an integer column into a float.
+
+The program uses two reference files. Constant values of BCO-DMO datetime variables names are stored in the file bcodmo_datetime_parameters.txt and possible datetime formats to check a column value by are stored in the file possilbe_datetime_formats.txt.
+
+Each data file parameter names are checked if they are a datetime parameter name stored in bcodmo_datetime_parameters.txt. If they are, the program will try to infer what the datetime format of the parameter values are. If the csv data file has a corresponding parameters information file, it is used to determine the official BCO-DMO parameter names of a parameter in order to check if it is in the file bcodmo_datetime_parameters.txt.
+
+To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. The program also infers if an alternate fill value is a possibility. The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json.
+
+Possible data types: string, integer, float, datetime, date, time, and null. Null occurs when a column is filled with NaN values.
+
+TODO: Determine data type of a column with only fill values.
+
+Data type inference order using all column values:
+
+A data type of a parameter column is inferred after removing NaN values and possible fill values from consideration. If a column is entirely a NaN value or entirely a fill value, the data type is null.
+
+The inference is determined by the following: if there is a string value in the column, the whole column is a string. If the parameter name is a BCO-DMO datetime name and it has a datetime format, the data type is one of date, time, or datetime. If there is no string value in a column and it is not a datetime column, if there is a float value, the whole column is a float. If there are no string values, datetimes, or floats, a column type is integer.
+
+If a parameter has an official datetime type name, it is checked as a date, time, or datetime type.
+
+Datetime format inference
+
+Some datetime formats are not included.
+
+%m%d%y is not included because it is difficult to distinguish unless two digit year
+is greater than 31 so that it can't be a month or day. And can't distinguish if the
+format could be %y%m%d. If assumed only format possible is %m%d%y and it's not a time
+datatype (which is currently only determined from the format and not the official time names),
+one could check if the first two digits or the second two digits is a day
+to determine positioning of the day and month values
+
+
+"""
+
+# Following steps from to determine datetime format
 #
-# filename = dataset_2291.json:
-# ```
-# {
-#   "source": "/jgofs-capture/2299/dataURL/chloro_bottle_ctd_join.csv",
-#   "filename": "chloro_bottle_ctd_join.csv",
-#   "columns": [
-#     "cruiseid": {"type": "string"},
-#     "year": {"type":"integer"},
-#     "lat": {"type": "float"},
-#     "time_local": {"type": "time", format: "HH:mm:ss"}
-#     ...
-#   ]
-# }
-# ```
+# https://stackoverflow.com/questions/53892450/get-the-format-in-dateutil-parse
+#
+
+# TODO
+# The program is slower in a Docker environment. To speed up, try the following
 
 # to speed up, see https://stackoverflow.com/questions/64370739/multiprocessing-pool-much-slower-than-manually-instantiating-multiple-processes
 
 # https://stackoverflow.com/questions/47989418/multiprocessing-python-program-inside-docker
 
-# TODO
-# Add logging
+
+# --------------
 
 # TODO
-# If a column is all NaN, the datatype is "isnan" at the moment, but should be 'NaN'
+# Set list of definite time variable names and then check them just for possible
+# time formats and do the same for dates only and datetimes. Then could avoid possibility of %m%d%y (if included) from being perceived at %H%M%S.
+
+
+#
+# TODO
+#
+# Make a list of variables in bcodmo datetime formats that ended up being a string. This means a format was unaccounted for
+#
+# If a datetime format has all NaNs, what is the output?
+#
+
+# TODO
+# if whole column is a 'fill' value, determine if it is a string, integer or float fill
 
 
 import os
@@ -39,52 +90,23 @@ from datetime import datetime, date
 import time
 import string
 import multiprocessing
-from scipy import stats
-import logging
-import logging.handlers
 import errno
-
 
 # import chardet
 # from chardet import detect
 # import codecs
 
-# ## Idea for processing
-#
-# Use the process parameter via a check of possible formats for each row. Then collect them and do probability stats on which ones are most likely
-#
-# First step, get the unique possibilities
-#
-# If it is NaN, skip over it
-#
-# Following steps from
-#
-# https://stackoverflow.com/questions/53892450/get-the-format-in-dateutil-parse
-#
-#
-# TODO
-#
-# Make a list of variables in bcodmo datetime formats that ended up being a string. This means a format was unaccounted for
-#
-# If a datetime format has all NaNs, what is the output?
-#
-
-# TODO
-# add summary file here too or add global vars file
-
-# or create a def with filenames and get names wherever
-
-# TODO
-# if whole column a 'fill' value, determine if it is a string, integer or float fill
+TESTING = False
+NUMBER_TESTING_ROWS = 5
 
 top_data_folder = f"../data"
 
-logging_dir = "../logs"
-
-log_errors = "../logs/log_files_with_errors_opening.txt"
 parameters_overview = "../logs/parameters_overview.txt"
-log_encodings_not_utf8 = "log_file_no_utf8_encoding.txt"
+parameters_summary_file = "../output/parameters_summary.json"
 
+log_encodings_not_utf8_file = "../logs/log_encodings_not_utf8.txt"
+
+# Read in possible datetime formats globally so can access in mulitple program sections
 possible_formats_file = "possible_datetime_formats.txt"
 df_formats = pd.read_fwf(possible_formats_file)
 datetime_formats_to_match = df_formats["datetime_formats"].tolist()
@@ -220,12 +242,6 @@ def save_parameters_overview(csv_file: str, final_results: dict):
             col_values = val["col_values"]
             values[col_name] = col_values[0]
 
-        # final_parameters_datetime_formats = {
-        #     key: values
-        #     for key, values in final_parameters_datetime_formats.items()
-        #     if not all(val is None for val in values)
-        # }
-
         final_parameters_datetime_formats = {
             key: value
             for key, value in final_parameters_datetime_formats.items()
@@ -257,8 +273,6 @@ def save_parameters_overview(csv_file: str, final_results: dict):
 # write any errors with reading in to log file
 def write_parameters_final_results(csv_file: str, final_results: dict):
     filename = Path(csv_file).name
-
-    parameters_summary_file = "../output/parameters_summary.txt"
 
     parameter_names_from_file = final_results.keys()
 
@@ -346,125 +360,18 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
         f.write(final_str)
 
 
-# TODO
-# I assume output is a dict but here I work with it as a string. A dict is easier
-#
-# Get data types and formats using inference of whole colummns
-# def write_parameters_final_results_old(csv_file: str, parameter_col_names, final_results):
-#     # Output example
-#     # {
-#     # "source": "/jgofs-capture/2299/dataURL/chloro_bottle_ctd_join.csv",
-#     # "filename": "chloro_bottle_ctd_join.csv",
-#     # "columns": [
-#     #     "cruiseid": {"type": "string"},
-#     #     "year": {"type":"integer"},
-#     #     "lat": {"type": "float"},
-#     #     "time_local": {"type": "time", format: "HH:mm:ss"}
-#     #     ...
-#     # ]
-#     # }
+def check_datetime_possible_minus_9s_fill_value(minus_9s: list) -> int | float | None:
+    fill_value = None
 
-#     # {"source": "../data/753036/dataURL/753036_v1_Lipid_Dendraster_OA_Expt2017.csv","filename": "753036_v1_Lipid_Dendraster_OA_Expt2017.csv","columns": ["temp_treatment": {"type": "integer"}, "pH_treatment": {"type": "string"}, "jar_replicate": {"type": "integer"}, "lipid_presence": {"type": "string"}, "lipid_area": {"type": "float"}, "stomach_area": {"type": "float"}, "lipid_index": {"type": "float"}, ]}
+    found_9s_fill = list(set(minus_9s))
 
-#     # TODO
-#     # Better define what an error is below. Is it a problem with the file or reading params
+    # Don't set as a fill value if there are multiple versions of a minus_9s fill
+    if len(found_9s_fill) == 1:
+        fill_value = found_9s_fill[0]
+    else:
+        fill_value = None
 
-#     # For each parameter, create columns entry with datatype and formats just for datetime parameters
-#     filename = Path(csv_file).name
-
-#     parameters_summary_file = "parameters_summary.txt"
-
-#     parameter_names_from_file = final_results.keys()
-
-#     with open(parameters_summary_file, "w") as f:
-#         f.write("{")
-
-#         f.write(f'"source": "{csv_file}",')
-
-#         f.write(f'"filename": "{filename}",')
-
-#         f.write('"columns": [')
-
-#         str_all_columns = ""
-#         for parameter_col_name in parameter_col_names:
-#             # already included parameter names from file if all parameter infor names none
-#             # TODO
-#             # make list of files with parameter names in json file that
-#             # are not in the csv file
-#             if parameter_col_name not in parameter_names_from_file:
-#                 continue
-
-#             # Need this to match the column names in the files,
-#             # but for final output, want the official name?
-
-#             try:
-#                 datatypes = final_results[parameter_col_name]["final_datatype"]
-#             except:
-#                 print(f"Error reading in {parameter_col_name} in file {csv_file}")
-#                 continue
-
-#             try:
-#                 datetime_formats = final_results[parameter_col_name]["unique_formats"]
-
-#             except KeyError:
-#                 print(
-#                     f"Error reading in datetime formats for {parameter_col_name} in file {csv_file}"
-#                 )
-#                 continue
-
-#             col_non_null_datatypes = [
-#                 str(datatype) for datatype in datatypes if datatype is not None
-#             ]
-
-#             str_col_non_null_datatypes = ""
-#             num_datatypes = len(datatypes)
-#             for i, datatype in enumerate(datatypes):
-#                 if datatype is None:
-#                     continue
-
-#                 if i != num_datatypes - 1:
-#                     str_col_non_null_datatypes = (
-#                         str_col_non_null_datatypes + str(datatype) + ", "
-#                     )
-
-#                 else:
-#                     str_col_non_null_datatypes = str_col_non_null_datatypes + str(
-#                         datatype
-#                     )
-
-#             col_non_null_formats = [
-#                 format for format in datetime_formats if format is not None
-#             ]
-
-#             # "cruiseid": {"type": "string"},
-#             str_col = (
-#                 f'"{parameter_col_name}": '
-#                 + '{"type": '
-#                 + f'"{str_col_non_null_datatypes}"'
-#                 + "}"
-#                 + ", "
-#             )
-
-#             str_all_columns = str_all_columns + str_col
-
-#         print("col_non null datatypes")
-#         print(str_all_columns)
-
-#         f.write(str_all_columns)
-
-#         # if col_non_null_datatypes and col_non_null_formats:
-#         #     print(
-#         #         f'"{parameter_col_name}": {"type": "{col_non_null_datatypes}", format: "{col_non_null_formats}"},'
-#         #     )
-#         # elif col_non_null_datatypes:
-#         #     print(
-#         #         f'    "{parameter_col_name}": {"type": "{col_non_null_datatypes}"},'
-#         #     )
-#         # else:
-#         #     print(f'    "{parameter_col_name}": {"type": ""},')
-
-#         f.write("]")
-#         f.write("}")
+    return fill_value
 
 
 def check_possible_minus_9s_fill_value(
@@ -472,36 +379,34 @@ def check_possible_minus_9s_fill_value(
 ) -> int | float | None:
     fill_value = None
 
-    # minus_9s fill takes priority over any string values
-    if len(minus_9s):
-        found_9s_fill = list(set(minus_9s))
-        print(f"{col_name} possible minus 9s fill {found_9s_fill}")
+    found_9s_fill = list(set(minus_9s))
+    print(f"{col_name} possible minus 9s fill {found_9s_fill}")
 
-        # Don't set as a fill value if there are multiple versions of a minus_9s fill
-        if len(found_9s_fill) == 1:
-            found_fill = found_9s_fill[0]
-        else:
-            found_fill = None
+    # Don't set as a fill value if there are multiple versions of a minus_9s fill
+    if len(found_9s_fill) == 1:
+        found_fill = found_9s_fill[0]
+    else:
+        found_fill = None
 
-        if found_fill is not None:
-            negative_numeric_values = [
-                val
-                for val in numeric_values
-                if val < 0 and not math.isclose(val, float(found_fill))
-            ]
+    if found_fill is not None:
+        negative_numeric_values = [
+            val
+            for val in numeric_values
+            if val < 0 and not math.isclose(val, float(found_fill))
+        ]
 
-            if len(negative_numeric_values):
-                # Until check for larger value than possible for negative values,
-                # don't include a minus_9s fill for negative numeric values
-                print(
-                    f"Fill value found in negative list of {col_name} col values other than fill"
-                )
-                fill_value = None
-            else:
-                fill_value = found_fill
-
-        else:
+        if len(negative_numeric_values):
+            # Until check for larger value than possible for negative values,
+            # don't include a minus_9s fill for negative numeric values
+            print(
+                f"Fill value found in negative list of {col_name} col values other than fill"
+            )
             fill_value = None
+        else:
+            fill_value = found_fill
+
+    else:
+        fill_value = None
 
     return fill_value
 
@@ -524,14 +429,92 @@ def check_is_minus_9s(value: str):
     return is_minus_9s
 
 
+def find_datetime_fill_values(col_value: str, datatype: str) -> tuple:
+    value = col_value.strip()
+
+    possible_fill_value = None
+    string_value = None
+    minus_9s_value = None
+
+    if datatype == "isfill":
+        # find which fill value it is
+        possible_fill_values = get_possible_fill_values()
+        possible_fill_value = set(col_value) & set(possible_fill_values)
+
+        if not possible_fill_value:
+            possible_fill_value = None
+
+    elif datatype == "string":
+        string_value = value
+
+    elif datatype == "float" or datatype == "integer":
+        # check if it is negative and then all 9's
+        if check_is_minus_9s(value):
+            minus_9s_value = value
+
+    return possible_fill_value, string_value, minus_9s_value
+
+
+def get_datetime_fill_values(col_values: list, datatypes: list) -> tuple:
+    possible_fill_values = []
+    string_values = []
+    minus_9s = []
+
+    for i in range(len(col_values)):
+        value = col_values[i]
+        datatype = datatypes[i]
+
+        possible_fill_value, string_value, minus_9s_value = find_datetime_fill_values(
+            value, datatype
+        )
+
+        if possible_fill_value is not None:
+            possible_fill_values.append(possible_fill_value)
+
+        if string_value is not None:
+            string_values.append(string_value)
+
+        if minus_9s_value is not None:
+            minus_9s.append(minus_9s_value)
+
+    if len(minus_9s) and not len(string_values) and not len(possible_fill_values):
+        fill_values = check_datetime_possible_minus_9s_fill_value(minus_9s)
+
+        alt_fill_values = None
+    elif len(string_values) and not len(minus_9s) and not len(possible_fill_values):
+        fill_values = None
+
+        unique_string_vals = list(set(string_values))
+
+        if len(unique_string_vals) == 1:
+            alt_fill_values = unique_string_vals[0]
+        else:
+            alt_fill_values = None
+
+    elif len(possible_fill_values) and not len(minus_9s) and not len(string_values):
+        fill_values = possible_fill_values
+        alt_fill_values = None
+    else:
+        fill_values = None
+        alt_fill_values = None
+
+    return fill_values, alt_fill_values
+
+
 def find_fill_and_numeric_values(col_value: str, datatype: str) -> tuple:
     value = col_value.strip()
 
+    possible_fill_value = None
     string_value = None
     minus_9s_value = None
     numeric_value = None
 
     if datatype == "isfill":
+        # find which fill value it is
+        possible_fill_values = get_possible_fill_values()
+        possible_fill_value = set(col_value) & set(possible_fill_values)
+        if not possible_fill_value:
+            possible_fill_value = None
         numeric_value = np.NaN
     elif datatype == "string":
         string_value = value
@@ -559,7 +542,65 @@ def find_fill_and_numeric_values(col_value: str, datatype: str) -> tuple:
             minus_9s_value = value
         numeric_value = float(value)
 
-    return string_value, minus_9s_value, numeric_value
+    return possible_fill_value, string_value, minus_9s_value, numeric_value
+
+
+def get_numeric_fill_values(col_name: str, col_values: list, datatypes: list) -> tuple:
+    possible_fill_values = []
+    string_values = []
+    numeric_values = []
+    minus_9s = []
+
+    for i in range(len(col_values)):
+        value = col_values[i]
+        datatype = datatypes[i]
+
+        (
+            possible_fill_value,
+            string_value,
+            minus_9s_value,
+            numeric_value,
+        ) = find_fill_and_numeric_values(value, datatype)
+
+        if possible_fill_value is not None:
+            possible_fill_values.append(possible_fill_value)
+
+        if string_value is not None:
+            string_values.append(string_value)
+
+        if minus_9s_value is not None:
+            minus_9s.append(minus_9s_value)
+
+        if numeric_value is not None:
+            numeric_values.append(numeric_value)
+
+    # TODO
+    # check if there are negative numbers and if they are, that
+    # -999 fill is larger than other negative numbers
+
+    if len(possible_fill_values) and not len(minus_9s) and not len(string_values):
+        fill_values = possible_fill_values
+        alt_fill_values = None
+    elif len(minus_9s) and not len(possible_fill_values) and not len(string_values):
+        fill_values = check_possible_minus_9s_fill_value(
+            col_name, minus_9s, numeric_values
+        )
+        alt_fill_values = None
+    elif len(string_values) and not len(minus_9s) and len(possible_fill_values):
+        fill_values = None
+
+        unique_string_vals = list(set(string_values))
+
+        if len(unique_string_vals) == 1:
+            alt_fill_values = unique_string_vals[0]
+        else:
+            alt_fill_values = None
+
+    else:
+        fill_values = None
+        alt_fill_values = None
+
+    return fill_values, alt_fill_values
 
 
 def find_params_fill_values(results: dict, final_results: dict) -> tuple:
@@ -591,53 +632,28 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
 
         # Look for fill in "float" or "integer" columns
         # Looking for minus 9s fills or string fill
-        if "float" in datatypes or "integer" in datatypes:
-            string_values = []
-            numeric_values = []
-            minus_9s = []
+        is_datetime = (
+            "date" in datatypes or "time" in datatypes or "datetime" in datatypes
+        )
+        is_numeric = "float" in datatypes or "integer" in datatypes and not is_datetime
 
-            for i in range(len(col_values)):
-                value = col_values[i]
-                datatype = datatypes[i]
+        if is_numeric:
+            numeric_fill_values, numeric_alt_fill_values = get_numeric_fill_values(
+                col_name, col_values, datatypes
+            )
 
-                (
-                    string_value,
-                    minus_9s_value,
-                    numeric_value,
-                ) = find_fill_and_numeric_values(value, datatype)
+            fill_values[col_name] = numeric_fill_values
+            alt_fill_values[col_name] = numeric_alt_fill_values
 
-                if string_value is not None:
-                    string_values.append(string_value)
+        elif is_datetime:
+            # Check if a possible fill value in it or an alternate fill value
 
-                if minus_9s_value is not None:
-                    minus_9s.append(minus_9s_value)
+            datetime_fill_values, datetime_alt_fill_values = get_datetime_fill_values(
+                col_values, datatypes
+            )
 
-                if numeric_value is not None:
-                    numeric_values.append(numeric_value)
-
-            # TODO
-            # check if there are negative numbers and if they are, that
-            # -999 fill is larger than other negative numbers
-
-            if len(minus_9s):
-                # minus_9s fill takes priority over any string values
-                fill_values[col_name] = check_possible_minus_9s_fill_value(
-                    col_name, minus_9s, numeric_values
-                )
-                alt_fill_values[col_name] = None
-            elif len(string_values):
-                fill_values[col_name] = None
-
-                unique_string_vals = list(set(string_values))
-
-                if len(unique_string_vals) == 1:
-                    alt_fill_values[col_name] = unique_string_vals[0]
-                else:
-                    alt_fill_values[col_name] = None
-
-            else:
-                fill_values[col_name] = None
-                alt_fill_values[col_name] = None
+            fill_values[col_name] = datetime_fill_values
+            alt_fill_values[col_name] = datetime_alt_fill_values
 
         else:
             fill_values[col_name] = None
@@ -646,10 +662,7 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
     return fill_values, alt_fill_values
 
 
-def get_parameter_final_datatype(unique_datatypes):
-    print(f"inside get_parameter_final_datatype")
-    print(f"starting unique datatypes are {unique_datatypes}")
-
+def get_parameter_final_datatype(unique_datatypes: list) -> str | None:
     # If there is a datatype along with NaN values, don't inlcude the
     # NaN values when determining the data type
     final_datatype = None
@@ -722,6 +735,49 @@ def get_parameter_final_datatype(unique_datatypes):
             final_datatype = "string"
 
     return final_datatype
+
+
+def check_datetime_format_length(
+    col_vals: list, format: str | None, datatype: str | None
+) -> tuple:
+    out_datatype = datatype
+    out_format = format
+
+    if format is not None and datatype is not None:
+        is_datetime = "datetime" in datatype or "time" in datatype or "date" in datatype
+    else:
+        is_datetime = False
+
+    if format == "%H%M" or format == "%H%M.%f" and is_datetime:
+        # check that the numeric length is 4 before the decimal point
+
+        first_piece = []
+        second_piece = []
+
+        for val in col_vals:
+            pieces = val.split(".")
+            try:
+                if len(pieces[0]) != 4:
+                    continue
+                first_piece.append(int(pieces[0]))
+                second_piece.append(int(pieces[1]))
+            except:
+                pass
+
+        if len(first_piece) and not len(second_piece):
+            out_format = "%H%M"
+            out_datatype = "time"
+        elif len(first_piece) and len(second_piece):
+            out_format = "%H%M.%f"
+            out_datatype = "time"
+        elif not len(first_piece) and not len(second_piece):
+            out_format = None
+            out_datatype = "integer"
+        elif not len(first_piece) and len(second_piece):
+            out_format = None
+            out_datatype = "float"
+
+    return out_format, out_datatype
 
 
 def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
@@ -934,9 +990,6 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
             except:
                 pass
 
-        print(f"first pieces are {first_piece}")
-        print(f"second pieces are {second_piece}")
-
         # check if first_piece > 12. Then it's definitely a day
         vals = [val for val in first_piece if val > 12]
         if len(vals):
@@ -950,9 +1003,6 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
             is_day_second_piece = True
         else:
             is_day_second_piece = False
-
-        print(f"is_day_first_piece {is_day_first_piece}")
-        print(f"is_day_second_piece {is_day_second_piece}")
 
         if is_day_first_piece:
             out_format = "%d/%m/%y"
@@ -991,7 +1041,7 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
     return out_formats
 
 
-def find_datatypes_from_formats(unique_formats):
+def find_datatypes_from_formats(unique_formats: list) -> list:
     # If there are multiple datetime formats, a format can't be determined,
     # so the datatype will not be a datetime
     # Now determine the datatype if it's not a datetime
@@ -999,8 +1049,6 @@ def find_datatypes_from_formats(unique_formats):
     # Replace % in format with '' and then check if there is one decimal point
     # to determine if it's an integer or float. But if there are extra characters
     # like ":", call it a string.
-
-    print("inside find_datatypes_from_formats")
 
     new_datatypes = []
     for format in unique_formats:
@@ -1030,27 +1078,23 @@ def find_datatypes_from_formats(unique_formats):
     # Now get unique datatypes. If they are different, the datatype is a string
     unique_datatypes = list(set(new_datatypes))
 
-    print(f"unique datatypes at end are {unique_datatypes}")
-
     return unique_datatypes
 
 
 def get_parameter_unique_datatypes(
-    col_values,
-    datatypes,
-    parameter_formats,
-    time_format_letters,
-    date_format_letters,
-    name_in_bcodmo_datetimes,
-):
+    col_values: list,
+    datatypes: list,
+    parameter_formats: list,
+    time_format_letters: list,
+    date_format_letters: list,
+    name_in_bcodmo_datetimes: bool,
+) -> list:
     new_datatypes = []
 
     for i in range(len(datatypes)):
         elem_datatype = datatypes[i]
         elem_format = parameter_formats[i]
         col_val = col_values[i]
-
-        print(f"elem index {i} datatype {elem_datatype} and format {elem_format}")
 
         if elem_format is not None and elem_datatype == "datetime":
             datatype_letters = re.split(r"[^a-zA-Z]*", elem_format)
@@ -1100,9 +1144,6 @@ def get_parameter_unique_datatypes(
                 except:
                     datatype = "string"
 
-                print("elem format None and datatype is datetime")
-                print(f"final datatype is {datatype}")
-
             new_datatypes.append(datatype)
 
         else:
@@ -1130,8 +1171,6 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
     final_results = {}
 
     for col_name in column_names:
-        print(f"parm {col_name}")
-
         final_results[col_name] = {}
 
         col_values = results[col_name]["col_values"]
@@ -1140,8 +1179,6 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         final_results[col_name]["possible_fill"] = results[col_name]["possible_fill"]
 
         datatypes = results[col_name]["col_datatypes"]
-
-        print(f"before datatypes are {datatypes}")
 
         # Fine tune whether a datetime type is date, time, or datetime
         # Need to know what the format looks like,
@@ -1157,8 +1194,6 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         parameter_formats = results[col_name]["col_formats"]
 
         # parameter_formats = [item for sublist in parameter_formats for item in sublist]
-
-        print(f"before formats are {parameter_formats}")
 
         # Find unique datatypes from looking at each parameter datatype and format
         # unique_datatypes may be None if the format for a value is None but has a datetime datatype
@@ -1176,9 +1211,6 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
             name_in_bcodmo_datetimes,
         )
 
-        print("unique datatypes")
-        print(unique_datatypes)
-
         # Get unique parameter formats and fine-tune
         if len(parameter_formats):
             unique_formats = list(set(parameter_formats))
@@ -1192,9 +1224,6 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         # If more than one format, see if can fine-tune to one best format
         if len(unique_formats):
             unique_formats = fine_tune_formats(col_values, unique_formats)
-
-        print(f"after fine tune formats")
-        print(unique_formats)
 
         # If there are still more than one unique_format even after fine tuning,
         # set the unique_format to None and change the datatype to an integer, float, or string
@@ -1212,12 +1241,15 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         elif len(unique_formats) == 1:
             final_format = unique_formats[0]
 
-        final_results[col_name]["final_format"] = final_format
-
         final_datatype = get_parameter_final_datatype(unique_datatypes)
 
-        print(f"final datatype is {final_datatype}")
+        # Check if a datetime datatype has an expected length and if not
+        # return a new format and datatype
+        final_format, final_datatype = check_datetime_format_length(
+            col_values, final_format, final_datatype
+        )
 
+        final_results[col_name]["final_format"] = final_format
         final_results[col_name]["final_datatype"] = final_datatype
 
     return final_results
@@ -1263,8 +1295,6 @@ def get_parameter_datatypes_fill(
                         datatype = "float"
                 except:
                     datatype = "string"
-
-        print(datatype)
 
         parameter_datatypes.append(datatype)
 
@@ -1318,33 +1348,24 @@ def get_parameters_datetime_formats(
     return result
 
 
+# Testing option included in function to limit number of rows to process
 def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
     # For BCO-DMO datetime paramters, get format
     bcodmo_datetime_parameters = get_bcodmo_datetime_parameters()
 
-    # formats = get_datetime_formats_to_match()
-
     column_names = df.columns
 
-    # Testing
-    testing = False
+    if TESTING:
+        # process limited number of rows to infer datatypes and datetime formats
 
-    if testing:
-        # process 5 rows to infer datatypes and datetime formats
-
-        df_new = df.iloc[0:5]
+        df_new = df.iloc[0:NUMBER_TESTING_ROWS]
 
     else:
         df_new = df.copy()
 
-    # df_datetime_formats = pd.DataFrame(dtype=str)
-    # df_datatypes = pd.DataFrame(dtype=str)
-
     results = {}
 
     for col_name in column_names:
-        print(f"param {col_name}")
-
         results[col_name] = {}
 
         column = df_new[col_name].copy()
@@ -1358,12 +1379,6 @@ def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
         parameter_datetime_formats = get_parameters_datetime_formats(
             col_vals, is_name_in_bcodmo_datetime_vars
         )
-
-        print(f"parameter_datetime_formats {parameter_datetime_formats}")
-
-        # parameter_datetime_formats = [
-        #     item for sublist in parameter_datetime_formats for item in sublist
-        # ]
 
         # TODO
         # If parameter_datetime_formats is just None values, write to file
@@ -1403,10 +1418,6 @@ def get_parameter_official_names(csv_file: str, parameter_col_names: list) -> di
     else:
         with open(parameters_info_filename, "r") as f:
             parameters_info = json.load(f)
-
-        # parameters output looks like
-        # "lat": {"type": "float"},
-        # "time_local": {"type": "time", format: "HH:mm:ss"}
 
         parameter_supplied_names = []
         parameter_official_names = {}
@@ -1463,7 +1474,7 @@ def get_file_df(filename: str) -> pd.DataFrame:
                 df = pd.read_csv(
                     filename, encoding="windows-1252", dtype=str, keep_default_na=False
                 )
-                with open(log_encodings_not_utf8, "a") as f:
+                with open(log_encodings_not_utf8_file, "a") as f:
                     f.write(f"{filename} encoding is windows-1252\n")
 
             except pd.errors.ParserError:
@@ -1475,15 +1486,15 @@ def get_file_df(filename: str) -> pd.DataFrame:
                         filename, encoding="latin1", dtype=str, keep_default_na=False
                     )
 
-                    with open(log_encodings_not_utf8, "a") as f:
+                    with open(log_encodings_not_utf8_file, "a") as f:
                         f.write(f"{filename} encoding is latin1\n")
 
                 except pd.errors.ParserError:
                     df = pd.DataFrame()
             except UnicodeDecodeError:
                 print("Error: File not opened as utf-8, windows-1252 or latin1")
-                with open(log_errors, "a") as f:
-                    f.write(f"{filename}\n")
+                with open(log_encodings_not_utf8_file, "a") as f:
+                    f.write(f"{filename} encoding unknown and not opened\n")
                 df = pd.DataFrame()
 
     return df
@@ -1564,16 +1575,9 @@ def main():
     parameters_overview_path = Path(parameters_overview)
     parameters_overview_path.unlink(missing_ok=True)
 
-    log_errors_path = Path(log_errors)
-    log_errors_path.unlink(missing_ok=True)
-
-    log_encodings_not_utf8_path = Path(log_encodings_not_utf8)
-    log_encodings_not_utf8_path.unlink(missing_ok=True)
-
     # Remove summary file that holds the program output of datatypes and formats
     # for each file
     os.makedirs("../output", exist_ok=True)
-    parameters_summary_file = "../output/parameters_summary.txt"
     try:
         os.remove(parameters_summary_file)
     except OSError as e:
@@ -1583,6 +1587,11 @@ def main():
     files = Path(top_data_folder).glob("**/dataURL/*.csv")
 
     file_list = list(files)
+
+    # The following comments are files to check for various issues
+
+    # TODO
+    # Test files need to be created
 
     # test 816278_v1_Chlorophyll_a.csv to look if supplied name UTC_Date has
     # official name in bcodmo_datetimes
@@ -1739,9 +1748,9 @@ def main():
     #     "%m/%d/%y",
     #     "%d/%m/%y"
     # ],
-    file_list = [
-        file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
-    ]
+    # file_list = [
+    #     file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
+    # ]
 
     # see 3911_v1_CTD_Profiles,csv
     # Check why format can't be determined
@@ -1763,16 +1772,19 @@ def main():
     # more than one format to choose from
     # file_list = [file for file in file_list if file.name == "3911_v1_CTD_Profiles.csv"]
 
+    # TODO
+    # check format of %H%M.%f when times are of form 61.88
+    # Need to check if it is of length 4 before the decimal point
+    # file_list = [file for file in file_list if file.name == "734364_v1_Shipboard_bioassay_experiments.csv"]
+    # because for file 3907_v1_lionfish_cleaner_bottle_expt.csv, %H%M.%f makes sense for time of 1038.43
+
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
 
     parameters_overview_path = Path(parameters_overview)
     parameters_overview_path.unlink(missing_ok=True)
 
-    log_errors_path = Path(log_errors)
-    log_errors_path.unlink(missing_ok=True)
-
-    log_encodings_not_utf8_path = Path(log_encodings_not_utf8)
+    log_encodings_not_utf8_path = Path(log_encodings_not_utf8_file)
     log_encodings_not_utf8_path.unlink(missing_ok=True)
 
     num_cores = multiprocessing.cpu_count()
