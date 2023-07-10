@@ -101,7 +101,7 @@ from get_fill_values import *
 # import codecs
 
 # Set this to True if want to use program with just a subset of rows in files
-TESTING = True
+TESTING = False
 NUMBER_TESTING_ROWS = 5
 
 # Set names of folders and files used
@@ -346,7 +346,7 @@ def get_parameter_final_datatype(unique_datatypes: list) -> str | None:
     """_summary_
 
     Returns:
-        _type_: _description_
+        str: final_datatype
     """
 
     # If there is a datatype along with NaN values, don't inlcude the
