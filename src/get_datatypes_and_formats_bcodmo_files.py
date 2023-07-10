@@ -101,7 +101,7 @@ from get_fill_values import *
 # import codecs
 
 # Set this to True if want to use program with just a subset of rows in files
-TESTING = False
+TESTING = True
 NUMBER_TESTING_ROWS = 5
 
 # Set names of folders and files used
@@ -1590,14 +1590,14 @@ def main():
     # Expected 20 fields and saw 21
     # filename = "3111_v1_MOC_zoop_AK_LTOP.csv"
 
+    # Expect notes field to be string type with NaN fill
+    # but it's not indicating the fill value because I don't
+    # look for a fill in a string column. The idea was maybe
+    # a fill value could be a valid string. But should I just check
+    # for NaN fill at least in a string column?
+    # filename = "811614_v2_GN01_Dissolved_Fe_II_.csv"
+
     # file_list = [file for file in file_list if file.name == filename]
-
-    # TODO
-    # Get list of files processed and find out why 711 in log file processed
-    # but started with 717. Some don't return results. why?
-
-    # TODO
-    # create a log of files not returning any results
 
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
