@@ -1,5 +1,4 @@
 """
-
 This program determines the datatype, datetime format, and fill value of parameters read in from a CSV data file. There are two files created. One is a log file, parameters_overview.txt, and the other is an output file, parameters_summary.json. The output file is an array of JSON objects of the form
 
 {
@@ -189,7 +188,7 @@ def get_parameters_info_filename(csv_file: str) -> str | None:
     """_summary_
 
     Returns:
-        _type_: _description_
+        str | None: parameters_file
     """
 
     dataset_id = get_dataset_id(csv_file)
@@ -223,12 +222,6 @@ def get_official_name(param_name: str, parameter_official_names: dict) -> str | 
 
 
 def save_parameters_overview(csv_file: str, final_results: dict):
-    """_summary_
-
-    Returns:
-        _type_: _description_
-    """
-
     # Get one line of parameter values to see sample values
     values = {}
     fill_values = {}
@@ -278,8 +271,6 @@ def save_parameters_overview(csv_file: str, final_results: dict):
         f.write(f"\n\n")
 
 
-# TODO
-# write any errors with reading in to log file
 def write_parameters_final_results(csv_file: str, final_results: dict):
     """_summary_
 
@@ -300,7 +291,6 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
 
     for parameter_col_name in parameter_names_from_file:
         param_obj = {}
-        # "cruiseid": {"type": "string"},
 
         try:
             final_datatype = final_results[parameter_col_name]["final_datatype"]
