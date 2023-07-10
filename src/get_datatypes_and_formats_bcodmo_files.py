@@ -789,18 +789,32 @@ def find_datatypes_from_formats(unique_formats: list) -> list:
 
 
 def get_parameter_unique_datatypes(
+    col_name: str,
     col_values: list,
     datatypes: list,
     parameter_formats: list,
-    time_format_letters: list,
-    date_format_letters: list,
-    name_in_bcodmo_datetimes: bool,
+    parameter_official_names: dict,
 ) -> list:
-    """_summary_
+    """
+    Fine tune whether a datetime type is date, time, or datetime
+    Need to know what the format looks like,
+    If it has H,M, or S in it, and no other letters, it's a time
+    If it has no H,M,S, it's a date
 
     Returns:
-        _type_: _description_
+        list: unique_datatypes
     """
+
+    name_in_bcodmo_datetimes = get_is_name_in_bcodmo_datetime_vars(
+        col_name, parameter_official_names
+    )
+
+    time_format_letters = ["H", "M", "S", "f"]
+
+    alphabet = string.ascii_lowercase + string.ascii_uppercase
+    date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
+
+    date_format_letters = list(date_format_letters)
 
     new_datatypes = []
 
@@ -866,6 +880,14 @@ def get_parameter_unique_datatypes(
 
     unique_datatypes = [elem for elem in unique_datatypes if elem]
 
+    # If there is a fill datatype, remove it to determine the datatype of remaining
+    if len(unique_datatypes) == 1 and "isfill" in unique_datatypes:
+        # All values are fill.
+        unique_datatypes = [None]
+
+    elif len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
+        unique_datatypes.remove("isfill")
+
     return unique_datatypes
 
 
@@ -878,12 +900,12 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
 
     # Refine datetime to be time, date, or datetime
 
-    time_format_letters = ["H", "M", "S", "f"]
+    # time_format_letters = ["H", "M", "S", "f"]
 
-    alphabet = string.ascii_lowercase + string.ascii_uppercase
-    date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
+    # alphabet = string.ascii_lowercase + string.ascii_uppercase
+    # date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
 
-    date_format_letters = list(date_format_letters)
+    # date_format_letters = list(date_format_letters)
 
     column_names = list(results.keys())
 
@@ -899,15 +921,6 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
 
         datatypes = results[col_name]["col_datatypes"]
 
-        # Fine tune whether a datetime type is date, time, or datetime
-        # Need to know what the format looks like,
-        # If it has H,M, or S in it, and no other letters, it's a time
-        # If it has no H,M,S, it's a date
-
-        name_in_bcodmo_datetimes = get_is_name_in_bcodmo_datetime_vars(
-            col_name, parameter_official_names
-        )
-
         parameter_formats = results[col_name]["col_formats"]
 
         # Find unique datatypes from looking at each parameter datatype and format
@@ -918,12 +931,11 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         # go through list of options to find the datatype
 
         unique_datatypes = get_parameter_unique_datatypes(
+            col_name,
             col_values,
             datatypes,
             parameter_formats,
-            time_format_letters,
-            date_format_letters,
-            name_in_bcodmo_datetimes,
+            parameter_official_names,
         )
 
         # Get unique parameter formats and fine-tune
@@ -932,12 +944,12 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
             unique_formats = [val for val in unique_formats if val]
 
             if not unique_formats:
-                unique_formats = [None]
+                unique_formats = None
         else:
-            unique_formats = [None]
+            unique_formats = None
 
         # If more than one format, see if can fine-tune to one best format
-        if len(unique_formats):
+        if unique_formats is not None:
             unique_formats = fine_tune_formats(col_values, unique_formats)
 
         # If there are still more than one unique_format even after fine tuning,
@@ -949,11 +961,11 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
 
         final_format = None
 
-        if len(unique_formats) > 1:
+        if unique_formats is not None and len(unique_formats) > 1:
             unique_datatypes = find_datatypes_from_formats(unique_formats)
             final_format = None
 
-        elif len(unique_formats) == 1:
+        elif unique_formats is not None and len(unique_formats) == 1:
             final_format = unique_formats[0]
 
         # TODO
@@ -1008,26 +1020,24 @@ def get_parameter_datatypes_and_possible_fills(
         else:
             is_datetime = False
 
-        if is_datetime:
+        # Mark as a fill value before marking as a string or datetime
+        if col_val in possible_fill_values:
+            datatype = "isfill"
+            fill_values.append(col_val)
+        elif is_datetime:
             datatype = "datetime"
-
         else:
-            # Mark as a fill value before marking as a string
-            if col_val in possible_fill_values:
-                datatype = "isfill"
-                fill_values.append(col_val)
-            else:
-                try:
-                    val_float = float(col_val)
+            try:
+                val_float = float(col_val)
 
-                    if math.isnan(val_float):
-                        datatype = "isnan"
-                    elif "." not in col_val:
-                        datatype = "integer"
-                    else:
-                        datatype = "float"
-                except:
-                    datatype = "string"
+                if math.isnan(val_float):
+                    datatype = "isnan"
+                elif "." not in col_val:
+                    datatype = "integer"
+                else:
+                    datatype = "float"
+            except:
+                datatype = "string"
 
         parameter_datatypes.append(datatype)
 
@@ -1579,6 +1589,7 @@ def main():
     # No results returned for this file. Has a pandas parsing error.
     # Expected 20 fields and saw 21
     # filename = "3111_v1_MOC_zoop_AK_LTOP.csv"
+
     # file_list = [file for file in file_list if file.name == filename]
 
     # TODO
