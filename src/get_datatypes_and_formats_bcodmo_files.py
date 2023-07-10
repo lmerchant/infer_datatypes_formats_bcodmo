@@ -891,7 +891,7 @@ def get_parameter_unique_datatypes(
     return unique_datatypes
 
 
-def get_final_results(results: dict, parameter_official_names: dict) -> dict:
+def infer_values_second_pass(results: dict, parameter_official_names: dict) -> dict:
     """_summary_
 
     Returns:
@@ -917,7 +917,9 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
         col_values = results[col_name]["col_values"]
         final_results[col_name]["col_values"] = col_values
 
-        final_results[col_name]["possible_fill"] = results[col_name]["possible_fill"]
+        # final_results[col_name]["col_possible_fill"] = results[col_name][
+        #     "col_possible_fill"
+        # ]
 
         datatypes = results[col_name]["col_datatypes"]
 
@@ -988,9 +990,9 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
     return final_results
 
 
-def get_parameter_datatypes_and_possible_fills(
-    col_vals: list, name_in_bcodmo_datetimes: bool
-) -> tuple:
+def get_parameter_datatypes(
+    col_name: str, col_vals: list, parameter_official_names: dict
+) -> list:
     """
     Get the datatype for each value in a parameter column and the
     fill value (out of a list of possible fill values) for a parameter column.
@@ -1000,11 +1002,13 @@ def get_parameter_datatypes_and_possible_fills(
 
     Returns:
         list: parameter_datatypes
-        str | None: fill_value
     """
-    parameter_datatypes = []
 
-    fill_values = []
+    is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
+        col_name, parameter_official_names
+    )
+
+    parameter_datatypes = []
 
     possible_fill_values = get_possible_fill_values()
 
@@ -1014,7 +1018,7 @@ def get_parameter_datatypes_and_possible_fills(
         # Remove any spaces that a column value might have
         col_val = col_val.strip()
 
-        if name_in_bcodmo_datetimes:
+        if is_name_in_bcodmo_datetime_vars:
             is_datetime = True
 
         else:
@@ -1023,7 +1027,6 @@ def get_parameter_datatypes_and_possible_fills(
         # Mark as a fill value before marking as a string or datetime
         if col_val in possible_fill_values:
             datatype = "isfill"
-            fill_values.append(col_val)
         elif is_datetime:
             datatype = "datetime"
         else:
@@ -1041,22 +1044,11 @@ def get_parameter_datatypes_and_possible_fills(
 
         parameter_datatypes.append(datatype)
 
-    possible_fill_value = list(set(fill_values))
-
-    # If mulitple possible fill values, it isn't a unique fill so exclude it
-    if len(possible_fill_value) == 1:
-        if "string" in parameter_datatypes:
-            fill_value = None
-        else:
-            fill_value = possible_fill_value[0]
-    else:
-        fill_value = None
-
-    return parameter_datatypes, fill_value
+    return parameter_datatypes
 
 
 def get_parameters_datetime_formats(
-    col_vals: list, is_name_in_bcodmo_datetime_vars: bool
+    col_name: str, col_vals: list, parameter_official_names: dict
 ) -> list:
     """
     Using reference file of possible datetime formats if a parameter name
@@ -1064,6 +1056,10 @@ def get_parameters_datetime_formats(
     return a list of them.
 
     """
+
+    is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
+        col_name, parameter_official_names
+    )
 
     result = []
 
@@ -1097,7 +1093,7 @@ def get_parameters_datetime_formats(
 
 
 # Testing option included in function to limit number of rows to process
-def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
+def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) -> dict:
     column_names = df.columns
 
     if TESTING:
@@ -1113,33 +1109,34 @@ def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
 
         column = df_new[col_name].copy()
 
-        is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
-            col_name, parameter_official_names
-        )
+        # is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
+        #     col_name, parameter_official_names
+        # )
 
         col_vals = list(column.values)
 
+        # Infer datetime formats for a column, and if not a datetime column,
+        # return None
         parameter_datetime_formats = get_parameters_datetime_formats(
-            col_vals, is_name_in_bcodmo_datetime_vars
+            col_name, col_vals, parameter_official_names
         )
 
         # TODO
         # If parameter_datetime_formats is just None values, write to file
         # because most likely that format is not in the list of datetime formats to look at
 
-        parameters_datatypes, fill_value = get_parameter_datatypes_and_possible_fills(
-            col_vals, is_name_in_bcodmo_datetime_vars
+        parameter_datatypes = get_parameter_datatypes(
+            col_name, col_vals, parameter_official_names
         )
 
         results[col_name]["col_values"] = col_vals
-        results[col_name]["col_datatypes"] = parameters_datatypes
+        results[col_name]["col_datatypes"] = parameter_datatypes
         results[col_name]["col_formats"] = parameter_datetime_formats
-        results[col_name]["possible_fill"] = fill_value
 
     return results
 
 
-def get_parameter_official_names(csv_file: str, parameter_col_names: list) -> dict:
+def get_parameters_official_names(csv_file: str, parameter_col_names: list) -> dict:
     """
     Read in the parameters info file to get the corresponding official name
     of supplied parameter names. Will use this later to determine which
@@ -1195,7 +1192,7 @@ def get_parameter_official_names(csv_file: str, parameter_col_names: list) -> di
 #     return encoding
 
 
-def get_file_df(filename: str) -> pd.DataFrame:
+def read_file(filename: str) -> pd.DataFrame:
     """
     Read in file to a pandas dataframe and keep values as strings
     so that integers aren't coerced to float or string depending on a fill value
@@ -1282,7 +1279,7 @@ def get_file_df(filename: str) -> pd.DataFrame:
 
 def get_final_params_datatypes_formats_fill(csv_file: str) -> dict | None:
     # Read in file to a pandas dataframe (all string values)
-    df = get_file_df(csv_file)
+    df = read_file(csv_file)
 
     # Get parameter column names as listed in the csv file
     column_names = list(df.columns)
@@ -1290,13 +1287,13 @@ def get_final_params_datatypes_formats_fill(csv_file: str) -> dict | None:
     # Get associated official names for each parameter in the csv file
     # This will be used to determine if a parameter is classified as a
     # datetime (time, date, datetime)
-    parameter_official_names = get_parameter_official_names(csv_file, column_names)
+    parameter_official_names = get_parameters_official_names(csv_file, column_names)
 
     # Do a first pass of inferring to get lists of unique values of
-    # choices for format, datatype and fill value for each column
-    # And retrieve the column values into a results dict
+    # format, datatype and fill value for each row in column.
+    # Also retrieve the column values into a results dict
     if not df.empty:
-        results = process_file_df(df, parameter_official_names)
+        results = infer_values_first_pass(df, parameter_official_names)
 
     else:
         results = None
@@ -1304,55 +1301,19 @@ def get_final_params_datatypes_formats_fill(csv_file: str) -> dict | None:
     # Fine tune results to get one format and one datatype
     if results:
         try:
-            final_results = get_final_results(results, parameter_official_names)
+            final_results = infer_values_second_pass(results, parameter_official_names)
         except:
             final_results = None
     else:
         final_results = None
 
-    if not results:
         print(f"{csv_file} has no results")
         with open(log_no_results_file, "a") as f:
             f.write(f"{csv_file}\n")
 
     # Use results (values for each row and col) and final results (values for each col) to determine fill values
     if results and final_results:
-        (
-            found_params_fill_values,
-            found_params_alt_fill_values,
-        ) = find_params_fill_values(results, final_results)
-
-        # There are 3 possible fill value sources
-        # 1) possible fill value is one of pre-determined possible fills list
-        # 2) fill value found for each column that can be minus 9s fills for
-        #    a datetime, integer, or float columns where valuses other than
-        #    a minus 9s fill are positive or datetime values. A numeric col
-        #    with minus values was not inferred from due to needing to take
-        #    into account factors like scale difference of a numeric fill
-        #    with non-fill values to find the correct 9s fill.
-        # 3) Fill value that is not a minus 9s or pre-determined fill value
-        #    which is determined by looking for a unique string fill in a
-        #    numeric or datetime column.
-        for col_name in final_results.keys():
-            # Only returning one possible fill value or else None
-            # Fill value that is not one of possible fill values list
-            col_found_fill_value = found_params_fill_values[col_name]
-            col_found_alt_fill_value = found_params_alt_fill_values[col_name]
-
-            # possible fill value from list of possible fill values list
-            possible_fill_value = final_results[col_name]["possible_fill"]
-
-            # possible fill value takes presedence over col_found_fill_value
-            if possible_fill_value is not None:
-                fill_value = possible_fill_value
-            elif col_found_fill_value is not None:
-                fill_value = col_found_fill_value
-            else:
-                fill_value = None
-
-            final_results[col_name]["fill_value"] = fill_value
-
-            final_results[col_name]["alt_fill_value"] = col_found_alt_fill_value
+        final_results = determine_fill_values(results, final_results)
 
     return final_results
 

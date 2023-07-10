@@ -424,3 +424,34 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
             alt_fill_values[col_name] = None
 
     return fill_values, alt_fill_values
+
+
+def determine_fill_values(results, final_results):
+    # There are 3 possible fill value sources
+    # 1) possible fill value is one of pre-determined possible fills list
+    # 2) fill value found for each column that can be minus 9s fills for
+    #    a datetime, integer, or float columns where valuses other than
+    #    a minus 9s fill are positive or datetime values. A numeric col
+    #    with minus values was not inferred from due to needing to take
+    #    into account factors like scale difference of a numeric fill
+    #    with non-fill values to find the correct 9s fill.
+    # 3) Fill value that is not a minus 9s or pre-determined fill value
+    #    which is determined by looking for a unique string fill in a
+    #    numeric or datetime column.
+
+    (
+        found_params_fill_values,
+        found_params_alt_fill_values,
+    ) = find_params_fill_values(results, final_results)
+
+    for col_name in final_results.keys():
+        # Only returning one possible fill value or else None
+        # Fill value that is not one of possible fill values list
+        col_found_fill_value = found_params_fill_values[col_name]
+        col_found_alt_fill_value = found_params_alt_fill_values[col_name]
+
+        final_results[col_name]["fill_value"] = col_found_fill_value
+
+        final_results[col_name]["alt_fill_value"] = col_found_alt_fill_value
+
+    return final_results
