@@ -102,7 +102,7 @@ from get_fill_values import *
 # import codecs
 
 # Set this to True if want to use program with just a subset of rows in files
-TESTING = True
+TESTING = False
 NUMBER_TESTING_ROWS = 5
 
 # Set names of folders and files used
@@ -222,8 +222,6 @@ def get_official_name(param_name: str, parameter_official_names: dict) -> str | 
     return parameter_official_name
 
 
-# TODO
-# call this a logging output
 def save_parameters_overview(csv_file: str, final_results: dict):
     """_summary_
 
@@ -988,7 +986,7 @@ def get_final_results(results: dict, parameter_official_names: dict) -> dict:
     return final_results
 
 
-def get_parameter_datatypes_fill(
+def get_parameter_datatypes_and_possible_fills(
     col_vals: list, name_in_bcodmo_datetimes: bool
 ) -> tuple:
     """
@@ -1129,7 +1127,7 @@ def process_file_df(df: pd.DataFrame, parameter_official_names: dict) -> dict:
         # If parameter_datetime_formats is just None values, write to file
         # because most likely that format is not in the list of datetime formats to look at
 
-        parameters_datatypes, fill_value = get_parameter_datatypes_fill(
+        parameters_datatypes, fill_value = get_parameter_datatypes_and_possible_fills(
             col_vals, is_name_in_bcodmo_datetime_vars
         )
 
