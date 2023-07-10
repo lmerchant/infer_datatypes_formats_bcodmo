@@ -1,15 +1,17 @@
 import math
 import numpy as np
 
+# TODO
+# search for fill values that are postitive 9s fill in a negative numeric
+# column or datetime column
 
-# List of possible fill types in BCO-DMO data files
-# I've treated any NaN values as np.NaN to ignore in determining the
-# datatype of a column
+
 def get_possible_fill_values() -> list:
-    """_summary_
+    """
+    List of possible fill types in BCO-DMO data files
 
     Returns:
-        _type_: _description_
+        list: possible_fill_values
     """
 
     # TODO
@@ -31,10 +33,13 @@ def get_possible_fill_values() -> list:
 
 
 def check_datetime_possible_minus_9s_fill_value(minus_9s: list) -> int | float | None:
-    """_summary_
+    """
+    Designate found a minus 9s fill if only one unique value found.
+
+    Minus 9s are any fill having 9s in it, including integers and floats.
 
     Returns:
-        _type_: _description_
+        str: fill_value
     """
 
     fill_value = None
@@ -53,10 +58,13 @@ def check_datetime_possible_minus_9s_fill_value(minus_9s: list) -> int | float |
 def check_possible_minus_9s_fill_value(
     col_name: str, minus_9s: list, numeric_values: list
 ) -> int | float | None:
-    """_summary_
+    """
+    Check if a fill of minus 9s sequence is acceptable. It's
+    acceptable if there is only one possiblity in a column
+    and that the numeric values are all positive.
 
     Returns:
-        _type_: _description_
+        str | None: fill_value
     """
 
     fill_value = None
@@ -77,12 +85,8 @@ def check_possible_minus_9s_fill_value(
             if val < 0 and not math.isclose(val, float(found_fill))
         ]
 
+        # If there are negative numbers in a column, don't use a minus 9s fill
         if len(negative_numeric_values):
-            # Until check for larger value than possible for negative values,
-            # don't include a minus_9s fill for negative numeric values
-            print(
-                f"Fill value found in negative list of {col_name} col values other than fill"
-            )
             fill_value = None
         else:
             fill_value = found_fill
@@ -94,10 +98,15 @@ def check_possible_minus_9s_fill_value(
 
 
 def check_is_minus_9s(value: str):
-    """_summary_
+    """
+    Split a column string value into pieces to check if
+    all characters are -, 9, or .
+
+    If the characters satisfy this condition, it's a minus 9s number
+    and a possible fill value.
 
     Returns:
-        _type_: _description_
+        bool: is_minus_9s
     """
 
     # split string value into a list of chars
@@ -118,10 +127,16 @@ def check_is_minus_9s(value: str):
 
 
 def find_datetime_fill_values(col_value: str, datatype: str) -> tuple:
-    """_summary_
+    """
+    Check whether a column value is a fill value. A fill value can
+    be one of the possible fill values defined in the function
+    get_possible_fill_values, a minus 9s value, or a string which will
+    be determined later if it is unique in a datetime column.
 
     Returns:
-        _type_: _description_
+        str | None: possible_fill_value
+        str | None: string_value
+        str | None: minus_9s_value
     """
 
     value = col_value.strip()
@@ -150,10 +165,18 @@ def find_datetime_fill_values(col_value: str, datatype: str) -> tuple:
 
 
 def get_datetime_fill_values(col_values: list, datatypes: list) -> tuple:
-    """_summary_
+    """
+    Find fill values that are either one of the defined possible
+    fill values from the function get_possible_fill_values or a minus 9s value.
+    If a string is unique in a datetime column, it is called an
+    alternate fill value. This alternate fill value is listed in the
+    log file parameters_overview.txt to provide feedback on whether these
+    alternate fill values should be included as one of the defined
+    possible fill values.
 
     Returns:
-        _type_: _description_
+        str | None: fill_value
+        str | None: alt_fill_value
     """
 
     possible_fill_values = []
@@ -178,27 +201,33 @@ def get_datetime_fill_values(col_values: list, datatypes: list) -> tuple:
             minus_9s.append(minus_9s_value)
 
     if len(minus_9s) and not len(string_values) and not len(possible_fill_values):
-        fill_values = check_datetime_possible_minus_9s_fill_value(minus_9s)
+        fill_value = check_datetime_possible_minus_9s_fill_value(minus_9s)
 
-        alt_fill_values = None
+        alt_fill_value = None
     elif len(string_values) and not len(minus_9s) and not len(possible_fill_values):
-        fill_values = None
+        fill_value = None
 
         unique_string_vals = list(set(string_values))
 
         if len(unique_string_vals) == 1:
-            alt_fill_values = unique_string_vals[0]
+            alt_fill_value = unique_string_vals[0]
         else:
-            alt_fill_values = None
+            alt_fill_value = None
 
     elif len(possible_fill_values) and not len(minus_9s) and not len(string_values):
-        fill_values = possible_fill_values
-        alt_fill_values = None
-    else:
-        fill_values = None
-        alt_fill_values = None
+        unique_possible_fill_vals = list(set(possible_fill_values))
 
-    return fill_values, alt_fill_values
+        if len(unique_possible_fill_vals) == 1:
+            fill_value = possible_fill_values[0]
+        else:
+            fill_value = None
+
+        alt_fill_value = None
+    else:
+        fill_value = None
+        alt_fill_value = None
+
+    return fill_value, alt_fill_value
 
 
 def find_fill_and_numeric_values(col_value: str, datatype: str) -> tuple:
@@ -252,10 +281,14 @@ def find_fill_and_numeric_values(col_value: str, datatype: str) -> tuple:
 
 
 def get_numeric_fill_values(col_name: str, col_values: list, datatypes: list) -> tuple:
-    """_summary_
+    """
+    Find fill value as one of a defined list of possible fill values
+    or a minus 9s fill value. Find alternate fill value as a
+    unique string in a numeric column.
 
     Returns:
-        _type_: _description_
+        str | None: fill_value
+        str | None: alt_fill_value
     """
 
     possible_fill_values = []
@@ -291,35 +324,42 @@ def get_numeric_fill_values(col_name: str, col_values: list, datatypes: list) ->
     # -999 fill is larger than other negative numbers
 
     if len(possible_fill_values) and not len(minus_9s) and not len(string_values):
-        fill_values = possible_fill_values
-        alt_fill_values = None
+        unique_possible_fill_vals = list(set(possible_fill_values))
+
+        if len(unique_possible_fill_vals) == 1:
+            fill_value = possible_fill_values[0]
+        else:
+            fill_value = None
+
+        alt_fill_value = None
     elif len(minus_9s) and not len(possible_fill_values) and not len(string_values):
-        fill_values = check_possible_minus_9s_fill_value(
+        fill_value = check_possible_minus_9s_fill_value(
             col_name, minus_9s, numeric_values
         )
-        alt_fill_values = None
+        alt_fill_value = None
     elif len(string_values) and not len(minus_9s) and not len(possible_fill_values):
-        fill_values = None
+        fill_value = None
 
         unique_string_vals = list(set(string_values))
 
         if len(unique_string_vals) == 1:
-            alt_fill_values = unique_string_vals[0]
+            alt_fill_value = unique_string_vals[0]
         else:
-            alt_fill_values = None
+            alt_fill_value = None
 
     else:
-        fill_values = None
-        alt_fill_values = None
+        fill_value = None
+        alt_fill_value = None
 
-    return fill_values, alt_fill_values
+    return fill_value, alt_fill_value
 
 
 def find_params_fill_values(results: dict, final_results: dict) -> tuple:
     """_summary_
 
     Returns:
-        _type_: _description_
+        dict: fill_values
+        dict: alt_fill_values
     """
 
     # Check for fill values in columns with numeric values
@@ -356,22 +396,22 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
         is_numeric = "float" in datatypes or "integer" in datatypes and not is_datetime
 
         if is_numeric:
-            numeric_fill_values, numeric_alt_fill_values = get_numeric_fill_values(
+            numeric_fill_value, numeric_alt_fill_value = get_numeric_fill_values(
                 col_name, col_values, datatypes
             )
 
-            fill_values[col_name] = numeric_fill_values
-            alt_fill_values[col_name] = numeric_alt_fill_values
+            fill_values[col_name] = numeric_fill_value
+            alt_fill_values[col_name] = numeric_alt_fill_value
 
         elif is_datetime:
             # Check if a possible fill value in it or an alternate fill value
 
-            datetime_fill_values, datetime_alt_fill_values = get_datetime_fill_values(
+            datetime_fill_value, datetime_alt_fill_value = get_datetime_fill_values(
                 col_values, datatypes
             )
 
-            fill_values[col_name] = datetime_fill_values
-            alt_fill_values[col_name] = datetime_alt_fill_values
+            fill_values[col_name] = datetime_fill_value
+            alt_fill_values[col_name] = datetime_alt_fill_value
 
         else:
             fill_values[col_name] = None
