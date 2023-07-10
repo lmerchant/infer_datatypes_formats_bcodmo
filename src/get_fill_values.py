@@ -148,10 +148,12 @@ def find_datetime_fill_values(col_value: str, datatype: str) -> tuple:
     if datatype == "isfill":
         # find which fill value it is
         possible_fill_values = get_possible_fill_values()
-        possible_fill_value = set(col_value) & set(possible_fill_values)
+        possible_fill_value = list(set([col_value]) & set(possible_fill_values))
 
         if not possible_fill_value:
             possible_fill_value = None
+        elif len(possible_fill_value) == 1:
+            possible_fill_value = possible_fill_value[0]
 
     elif datatype == "string":
         string_value = value
@@ -164,7 +166,7 @@ def find_datetime_fill_values(col_value: str, datatype: str) -> tuple:
     return possible_fill_value, string_value, minus_9s_value
 
 
-def get_datetime_fill_values(col_values: list, datatypes: list) -> tuple:
+def get_datetime_fill_values(col_name: str, col_values: list, datatypes: list) -> tuple:
     """
     Find fill values that are either one of the defined possible
     fill values from the function get_possible_fill_values or a minus 9s value.
@@ -247,9 +249,13 @@ def find_fill_and_numeric_values(col_value: str, datatype: str) -> tuple:
     if datatype == "isfill":
         # find which fill value it is
         possible_fill_values = get_possible_fill_values()
-        possible_fill_value = set(col_value) & set(possible_fill_values)
+        possible_fill_value = list(set([col_value]) & set(possible_fill_values))
+
         if not possible_fill_value:
             possible_fill_value = None
+        elif len(possible_fill_value) == 1:
+            possible_fill_value = possible_fill_value[0]
+
         numeric_value = np.NaN
     elif datatype == "string":
         string_value = value
@@ -407,7 +413,7 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
             # Check if a possible fill value in it or an alternate fill value
 
             datetime_fill_value, datetime_alt_fill_value = get_datetime_fill_values(
-                col_values, datatypes
+                col_name, col_values, datatypes
             )
 
             fill_values[col_name] = datetime_fill_value
