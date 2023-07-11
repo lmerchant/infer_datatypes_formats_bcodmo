@@ -574,9 +574,9 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
             out_format = "%m/%d/%Y"
 
         else:
-            out_format = "starting formats"
+            out_format = "starting_formats"
 
-        if out_format == "starting formats":
+        if out_format == "starting_formats":
             out_formats = unique_formats
         else:
             out_formats = [out_format]
@@ -619,14 +619,12 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
             out_format = "%m/%d/%Y"
 
         else:
-            out_format = "starting formats"
+            out_format = "starting_formats"
 
-        if out_format == "starting formats":
+        if out_format == "starting_formats":
             out_formats = unique_formats
         else:
             out_formats = [out_format]
-
-        out_formats = [out_format]
 
     # Check various date forms
     # Here assume 0 padding
@@ -667,9 +665,9 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
             out_format = "%m%d%Y"
 
         else:
-            out_format = "starting formats"
+            out_format = "starting_formats"
 
-        if out_format == "starting formats":
+        if out_format == "starting_formats":
             out_formats = unique_formats
         else:
             out_formats = [out_format]
@@ -718,9 +716,9 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
             out_format = "%m%d%Y"
 
         else:
-            out_format = "starting formats"
+            out_format = "starting_formats"
 
-        if out_format == "starting formats":
+        if out_format == "starting_formats":
             out_formats = unique_formats
         else:
             out_formats = [out_format]
@@ -763,9 +761,9 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
             out_format = "%m/%d/%y"
 
         else:
-            out_format = "starting formats"
+            out_format = "starting_formats"
 
-        if out_format == "starting formats":
+        if out_format == "starting_formats":
             out_formats = unique_formats
         else:
             out_formats = [out_format]
@@ -1021,6 +1019,11 @@ def get_col_val_datetime_formats(
 def get_col_value_datatype(
     col_val: str, possible_fill_values: list, is_datetime: bool
 ) -> str:
+    """_summary_
+
+    Returns:
+        str: datatype
+    """
     # Mark as a fill value before marking as a string or datetime
     if col_val in possible_fill_values:
         datatype = "isfill"
@@ -1044,6 +1047,12 @@ def get_col_value_datatype(
 
 # Testing option included in function to limit number of rows to process
 def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) -> dict:
+    """_summary_
+
+    Returns:
+        dict: results
+    """
+
     column_names = df.columns
 
     if TESTING:
@@ -1114,6 +1123,8 @@ def get_parameters_official_names(csv_file: str, parameter_col_names: list) -> d
     Supplied parameter names from the parameter file mapped to BCO-DMO
     official names which are stored in the parameters info file
 
+    Returns:
+        dict: parameter_official_names
     """
 
     parameters_info_filename = get_parameters_info_filename(csv_file)
