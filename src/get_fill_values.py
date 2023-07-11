@@ -106,7 +106,8 @@ def check_possible_minus_9s_fill_value(
 def check_is_minus_9s(value: str):
     """
     Split a column string value into pieces to check if
-    all characters are -, 9, or .
+    all characters are -, 9, ., or 0 and then check if it
+    is variation of -9, -99, -999, etc or float -9.0, -99.0, -999.0
 
     If the characters satisfy this condition, it's a minus 9s number
     and a possible fill value.
@@ -120,12 +121,34 @@ def check_is_minus_9s(value: str):
     unique_pieces = list(set(pieces))
 
     if len(unique_pieces) == 2:
+        # finds minus integer values of -9, -99, -999, etc
         is_minus_9s = "-" in unique_pieces and "9" in unique_pieces
 
-    elif len(unique_pieces) == 3:
-        is_minus_9s = (
-            "-" in unique_pieces and "9" in unique_pieces and "." in unique_pieces
+    elif len(unique_pieces) == 4:
+        # Finds minus values of -9.0, -99.0, -999.0
+        has_decimal_9s = (
+            "-" in unique_pieces
+            and "9" in unique_pieces
+            and "." in unique_pieces
+            and "0" in unique_pieces
         )
+
+        if has_decimal_9s:
+            numeric_pieces = value.split(".")
+
+            if len(numeric_pieces) == 2:
+                decimal_portion = numeric_pieces[1]
+                if list(decimal_portion) == "0":
+                    is_minus_9s = True
+                else:
+                    is_minus_9s = False
+
+            else:
+                is_minus_9s = False
+
+        else:
+            is_minus_9s = False
+
     else:
         is_minus_9s = False
 

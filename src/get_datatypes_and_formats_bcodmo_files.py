@@ -18,7 +18,7 @@ The program uses two reference files. Constant values of BCO-DMO datetime variab
 
 Each data file parameter names are checked if they are a datetime parameter name stored in bcodmo_datetime_parameters.txt. If they are, the program will try to infer what the datetime format of the parameter values are. If the csv data file has a corresponding parameters information file, it is used to determine the official BCO-DMO parameter names of a parameter in order to check if it is in the file bcodmo_datetime_parameters.txt.
 
-To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. The program also infers if an alternate fill value is a possibility. The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json.
+To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. Along with the predefined set of fill values, it infers a fill value of a series of minus 9s (-999, -999.0 for example) in a numeric column with positive values ore in a datetime column. The program also infers if an alternate fill value is a possibility. The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json.
 
 Possible data types: string, integer, float, datetime, date, time, and null. Null occurs when a column is filled with NaN values.
 
