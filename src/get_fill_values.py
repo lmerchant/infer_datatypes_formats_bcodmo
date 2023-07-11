@@ -16,6 +16,11 @@ def get_possible_fill_values() -> list:
 
     # TODO
     # Find out if "bd" counts as a fill value (means below detection)
+
+    # Added empty string as a possible fill value in a numeric column
+    # look at dataset_893293.csv
+    # Says Silicate is a string but that's because it encountered a blank value
+    # Need code to skip over blank values when determining a col datatype
     possible_fill_values = [
         "NaN",
         "nan",
@@ -27,6 +32,7 @@ def get_possible_fill_values() -> list:
         "NA",
         "na",
         "n/a",
+        "",
     ]
 
     return possible_fill_values
@@ -401,6 +407,8 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
         )
         is_numeric = "float" in datatypes or "integer" in datatypes and not is_datetime
 
+        is_all_fill = list(set(datatypes)) == ["isfill"]
+
         if is_numeric:
             numeric_fill_value, numeric_alt_fill_value = get_numeric_fill_values(
                 col_name, col_values, datatypes
@@ -419,6 +427,14 @@ def find_params_fill_values(results: dict, final_results: dict) -> tuple:
             fill_values[col_name] = datetime_fill_value
             alt_fill_values[col_name] = datetime_alt_fill_value
 
+        elif is_all_fill:
+            unique_col_value = list(set(col_values))
+
+            if len(unique_col_value) == 1:
+                fill_values[col_name] = unique_col_value[0]
+            else:
+                fill_values[col_name] = None
+            alt_fill_values[col_name] = None
         else:
             fill_values[col_name] = None
             alt_fill_values[col_name] = None
