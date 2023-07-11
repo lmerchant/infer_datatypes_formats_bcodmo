@@ -342,6 +342,61 @@ def write_parameters_final_results(csv_file: str, final_results: dict):
         f.write(final_str)
 
 
+def check_datetime_format_and_datatype(
+    col_vals: list, format: str | None, datatype: str | None
+) -> tuple:
+    """
+    Look at certain formats and check length of column values based on
+    datetime format. If it doesn't match, reinterpret datatype.
+    If the length doesn't match, it's not a datetime format,
+    so determine what type it is.
+
+    Returns:
+        str | None: out_format
+        str: out_datatype
+    """
+
+    out_datatype = datatype
+    out_format = format
+
+    if format is not None and datatype is not None:
+        is_datetime = datatype == "datetime" or datatype == "time" or datatype == "date"
+    else:
+        is_datetime = False
+
+    if format == "%H%M" or format == "%H%M.%f" and is_datetime:
+        # check that the numeric length is 4 before the decimal point
+        # to match format %H%M which implies two char Hour and two char Minutes
+
+        first_piece = []
+        second_piece = []
+
+        for val in col_vals:
+            pieces = val.split(".")
+            try:
+                if len(pieces[0]) != 4:
+                    continue
+                first_piece.append(int(pieces[0]))
+                second_piece.append(int(pieces[1]))
+            except:
+                pass
+
+        if len(first_piece) and not len(second_piece):
+            out_format = "%H%M"
+            out_datatype = "time"
+        elif len(first_piece) and len(second_piece):
+            out_format = "%H%M.%f"
+            out_datatype = "time"
+        elif not len(first_piece) and not len(second_piece):
+            out_format = None
+            out_datatype = "integer"
+        elif not len(first_piece) and len(second_piece):
+            out_format = None
+            out_datatype = "float"
+
+    return out_format, out_datatype
+
+
 def get_parameter_final_datatype(unique_datatypes: list) -> str | None:
     """_summary_
 
@@ -423,56 +478,52 @@ def get_parameter_final_datatype(unique_datatypes: list) -> str | None:
     return final_datatype
 
 
-def check_datetime_format_length(
-    col_vals: list, format: str | None, datatype: str | None
-) -> tuple:
-    """_summary_
+def get_datatypes_from_formats(unique_formats: list) -> list:
+    """
+    If there are multiple datetime formats, a format can't be determined,
+    so the datatype will not be a datetime
+    Now need to determine the datatype if it's not a datetime
+
+    Replace % in format with '' and then check if there is one decimal point
+    to determine if it's an integer or float. But if there are extra characters
+    like ":", call it a string.
 
     Returns:
         _type_: _description_
     """
 
-    out_datatype = datatype
-    out_format = format
+    new_datatypes = []
+    for format in unique_formats:
+        bare_format = format.replace("%", "")
 
-    if format is not None and datatype is not None:
-        is_datetime = "datetime" in datatype or "time" in datatype or "date" in datatype
-    else:
-        is_datetime = False
+        non_alpha_chars = []
+        for character in bare_format:
+            if not character.isalpha():
+                non_alpha_chars.append(character)
 
-    if format == "%H%M" or format == "%H%M.%f" and is_datetime:
-        # check that the numeric length is 4 before the decimal point
+        if bare_format.isalpha():
+            datatype = "integer"
+        elif "." in non_alpha_chars:
+            # Find number of chars if one period removed
+            num_chars = len(non_alpha_chars) - 1
 
-        first_piece = []
-        second_piece = []
+            # Check if any chars left, and if they are, the datatype is not a float
+            if num_chars:
+                datatype = "string"
+            else:
+                datatype = "float"
+        else:
+            datatype = "string"
 
-        for val in col_vals:
-            pieces = val.split(".")
-            try:
-                if len(pieces[0]) != 4:
-                    continue
-                first_piece.append(int(pieces[0]))
-                second_piece.append(int(pieces[1]))
-            except:
-                pass
+        new_datatypes.append(datatype)
 
-        if len(first_piece) and not len(second_piece):
-            out_format = "%H%M"
-            out_datatype = "time"
-        elif len(first_piece) and len(second_piece):
-            out_format = "%H%M.%f"
-            out_datatype = "time"
-        elif not len(first_piece) and not len(second_piece):
-            out_format = None
-            out_datatype = "integer"
-        elif not len(first_piece) and len(second_piece):
-            out_format = None
-            out_datatype = "float"
+    # Now get unique datatypes. If they are different, the datatype is a string
+    unique_datatypes = list(set(new_datatypes))
 
-    return out_format, out_datatype
+    return unique_datatypes
 
 
-def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
+def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
     """
     Take a list of inferred parameter formats and determine which one best
     describes the parameter column values. If one can't be determined,
@@ -742,52 +793,6 @@ def fine_tune_formats(col_vals: list, unique_formats: list) -> list:
     return out_formats
 
 
-def find_datatypes_from_formats(unique_formats: list) -> list:
-    """_summary_
-
-    Returns:
-        _type_: _description_
-    """
-
-    # If there are multiple datetime formats, a format can't be determined,
-    # so the datatype will not be a datetime
-    # Now determine the datatype if it's not a datetime
-
-    # Replace % in format with '' and then check if there is one decimal point
-    # to determine if it's an integer or float. But if there are extra characters
-    # like ":", call it a string.
-
-    new_datatypes = []
-    for format in unique_formats:
-        bare_format = format.replace("%", "")
-
-        non_alpha_chars = []
-        for character in bare_format:
-            if not character.isalpha():
-                non_alpha_chars.append(character)
-
-        if bare_format.isalpha():
-            datatype = "integer"
-        elif "." in non_alpha_chars:
-            # Find number of chars if one period removed
-            num_chars = len(non_alpha_chars) - 1
-
-            # Check if any chars left, and if they are, the datatype is not a float
-            if num_chars:
-                datatype = "string"
-            else:
-                datatype = "float"
-        else:
-            datatype = "string"
-
-        new_datatypes.append(datatype)
-
-    # Now get unique datatypes. If they are different, the datatype is a string
-    unique_datatypes = list(set(new_datatypes))
-
-    return unique_datatypes
-
-
 def get_parameter_unique_datatypes(
     col_name: str,
     col_values: list,
@@ -898,15 +903,6 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
         _type_: _description_
     """
 
-    # Refine datetime to be time, date, or datetime
-
-    # time_format_letters = ["H", "M", "S", "f"]
-
-    # alphabet = string.ascii_lowercase + string.ascii_uppercase
-    # date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
-
-    # date_format_letters = list(date_format_letters)
-
     column_names = list(results.keys())
 
     final_results = {}
@@ -916,10 +912,6 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
 
         col_values = results[col_name]["col_values"]
         final_results[col_name]["col_values"] = col_values
-
-        # final_results[col_name]["col_possible_fill"] = results[col_name][
-        #     "col_possible_fill"
-        # ]
 
         datatypes = results[col_name]["col_datatypes"]
 
@@ -940,7 +932,7 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
             parameter_official_names,
         )
 
-        # Get unique parameter formats and fine-tune
+        # Get unique parameter formats
         if len(parameter_formats):
             unique_formats = list(set(parameter_formats))
             unique_formats = [val for val in unique_formats if val]
@@ -952,19 +944,22 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
 
         # If more than one format, see if can fine-tune to one best format
         if unique_formats is not None:
-            unique_formats = fine_tune_formats(col_values, unique_formats)
+            unique_formats = fine_tune_datetime_formats(col_values, unique_formats)
 
         # If there are still more than one unique_format even after fine tuning,
-        # set the unique_format to None and change the datatype to an integer, float, or string
+        # set the unique_format to None and change the datatype to an
+        # integer, float, or string
         # depending on the formats.
-        # A case is when a time parameter is of the form HHMMSS but is indistinguishable from
-        # multiple date formats. For example, it could have both formats "%Y%m%d" and "%m%d%Y".
-        # Since 'time' is in the parameter name, it should not be a date format but a time format.
+        # A case is when a time parameter is of the form HHMMSS but is
+        # indistinguishable from multiple date formats.
+        # For example, it could have both formats "%Y%m%d" and "%m%d%Y".
+        # Since 'time' is in the parameter name, it should not be a date format
+        # but a time format.
 
         final_format = None
 
         if unique_formats is not None and len(unique_formats) > 1:
-            unique_datatypes = find_datatypes_from_formats(unique_formats)
+            unique_datatypes = get_datatypes_from_formats(unique_formats)
             final_format = None
 
         elif unique_formats is not None and len(unique_formats) == 1:
@@ -979,8 +974,7 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
 
         # Check if a datetime datatype has an expected length and if not
         # return a new format and datatype
-
-        final_format, final_datatype = check_datetime_format_length(
+        final_format, final_datatype = check_datetime_format_and_datatype(
             col_values, final_format, final_datatype
         )
 
@@ -990,106 +984,62 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
     return final_results
 
 
-def get_parameter_datatypes(
-    col_name: str, col_vals: list, parameter_official_names: dict
+def get_col_val_datetime_formats(
+    col_val: str, is_name_in_bcodmo_datetime_vars: bool
 ) -> list:
-    """
-    Get the datatype for each value in a parameter column and the
-    fill value (out of a list of possible fill values) for a parameter column.
+    # Infer datetime formats for a column value, and if not a datetime column,
+    # return None
 
-    If column datatypes is a string, don't set a fill value because
-    a possible fill value could be a valid string value for the parameter
+    # TODO
+    # If parameter is a datetiem and its format is None, write to a log file
+    # because most likely that format is not in the list of datetime formats to match to
 
-    Returns:
-        list: parameter_datatypes
-    """
+    parsed_timestamps = {"col_val": col_val, "matches": []}
 
-    is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
-        col_name, parameter_official_names
-    )
-
-    parameter_datatypes = []
-
-    possible_fill_values = get_possible_fill_values()
-
-    for i in range(len(col_vals)):
-        col_val = col_vals[i]
-
-        # Remove any spaces that a column value might have
-        col_val = col_val.strip()
-
-        if is_name_in_bcodmo_datetime_vars:
-            is_datetime = True
-
-        else:
-            is_datetime = False
-
-        # Mark as a fill value before marking as a string or datetime
-        if col_val in possible_fill_values:
-            datatype = "isfill"
-        elif is_datetime:
-            datatype = "datetime"
-        else:
+    if is_name_in_bcodmo_datetime_vars:
+        for f in datetime_formats_to_match:
             try:
-                val_float = float(col_val)
-
-                if math.isnan(val_float):
-                    datatype = "isnan"
-                elif "." not in col_val:
-                    datatype = "integer"
-                else:
-                    datatype = "float"
+                d = datetime.strptime(col_val, f)
             except:
-                datatype = "string"
+                continue
 
-        parameter_datatypes.append(datatype)
+            parsed_timestamps["matches"].append({"datetime": d, "format": f})
 
-    return parameter_datatypes
+    matches = parsed_timestamps["matches"]
+
+    datetime_formats = []
+    if matches:
+        for match in matches:
+            format = match["format"]
+            datetime_formats.append(format)
+    else:
+        datetime_formats.append(None)
+
+    return datetime_formats
 
 
-def get_parameters_datetime_formats(
-    col_name: str, col_vals: list, parameter_official_names: dict
-) -> list:
-    """
-    Using reference file of possible datetime formats if a parameter name
-    is one of the BCO-DMO datetime names, find all datetime matches and
-    return a list of them.
+def get_col_value_datatype(
+    col_val: str, possible_fill_values: list, is_datetime: bool
+) -> str:
+    # Mark as a fill value before marking as a string or datetime
+    if col_val in possible_fill_values:
+        datatype = "isfill"
+    elif is_datetime:
+        datatype = "datetime"
+    else:
+        try:
+            val_float = float(col_val)
 
-    """
+            if math.isnan(val_float):
+                datatype = "isnan"
+            elif "." not in col_val:
+                datatype = "integer"
+            else:
+                datatype = "float"
+        except:
+            datatype = "string"
 
-    is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
-        col_name, parameter_official_names
-    )
-
-    result = []
-
-    for i in range(len(col_vals)):
-        parsed_timestamps = {"col_val": col_vals[i], "matches": []}
-
-        if is_name_in_bcodmo_datetime_vars:
-            for f in datetime_formats_to_match:
-                try:
-                    d = datetime.strptime(col_vals[i], f)
-                except:
-                    continue
-
-                parsed_timestamps["matches"].append({"datetime": d, "format": f})
-
-        matches = parsed_timestamps["matches"]
-
-        new_formats = []
-        if matches:
-            for match in matches:
-                format = match["format"]
-                new_formats.append(format)
-        else:
-            new_formats.append(None)
-
-        result.append(new_formats)
-
-    result = [item for sublist in result for item in sublist]
-
-    return result
+    return datatype
 
 
 # Testing option included in function to limit number of rows to process
@@ -1105,29 +1055,48 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
     results = {}
 
     for col_name in column_names:
+        is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
+            col_name, parameter_official_names
+        )
+
+        if is_name_in_bcodmo_datetime_vars:
+            is_datetime = True
+
+        else:
+            is_datetime = False
+
+        possible_fill_values = get_possible_fill_values()
+
+        parameter_datatypes = []
+        param_datetime_formats = []
+
         results[col_name] = {}
 
         column = df_new[col_name].copy()
-
-        # is_name_in_bcodmo_datetime_vars = get_is_name_in_bcodmo_datetime_vars(
-        #     col_name, parameter_official_names
-        # )
-
         col_vals = list(column.values)
 
-        # Infer datetime formats for a column, and if not a datetime column,
-        # return None
-        parameter_datetime_formats = get_parameters_datetime_formats(
-            col_name, col_vals, parameter_official_names
-        )
+        for i in range(len(col_vals)):
+            col_val = col_vals[i]
 
-        # TODO
-        # If parameter_datetime_formats is just None values, write to file
-        # because most likely that format is not in the list of datetime formats to look at
+            # Remove any spaces that a column value might have
+            col_val = col_val.strip()
 
-        parameter_datatypes = get_parameter_datatypes(
-            col_name, col_vals, parameter_official_names
-        )
+            datatype = get_col_value_datatype(
+                col_val, possible_fill_values, is_datetime
+            )
+
+            parameter_datatypes.append(datatype)
+
+            datetime_formats = get_col_val_datetime_formats(
+                col_val, is_name_in_bcodmo_datetime_vars
+            )
+
+            param_datetime_formats.append(datetime_formats)
+
+        # Expand list of lists
+        parameter_datetime_formats = [
+            item for sublist in param_datetime_formats for item in sublist
+        ]
 
         results[col_name]["col_values"] = col_vals
         results[col_name]["col_datatypes"] = parameter_datatypes
@@ -1160,7 +1129,6 @@ def get_parameters_official_names(csv_file: str, parameter_col_names: list) -> d
         with open(parameters_info_filename, "r") as f:
             parameters_info = json.load(f)
 
-        parameter_supplied_names = []
         parameter_official_names = {}
 
         for parameter in parameters_info:
@@ -1174,7 +1142,6 @@ def get_parameters_official_names(csv_file: str, parameter_col_names: list) -> d
             except KeyError:
                 official_name = None
 
-            parameter_supplied_names.append(supplied_name)
             parameter_official_names[supplied_name] = official_name
 
     return parameter_official_names
@@ -1201,6 +1168,14 @@ def read_file(filename: str) -> pd.DataFrame:
     Try opening files with different encodings in case there is a UnicodeDecodeError
     when opening the file to read it. Try the UTF-8, Windows-1252,
     and Latin1 encodings
+
+    If the number of headers and data columns don't match, Pandas throws a parse error.
+    These files aren't processed because they don't match a parameter name with
+    parameter values format. Some files it's clear the headers don't exist for
+    all columns, but some files open in Excel well and I don't see a problem.
+    This file for example, 3111_v1_MOC_zoop_AK_LTOP.csv, has a parse error where
+    20 columns are expected, but 21 are found. And the problem can also come
+    from bad converstion from tsv to csv.
 
     Returns:
         pd.DataFrame: df
@@ -1277,7 +1252,7 @@ def read_file(filename: str) -> pd.DataFrame:
     return df
 
 
-def get_final_params_datatypes_formats_fill(csv_file: str) -> dict | None:
+def get_params_datatypes_formats_fill(csv_file: str) -> dict | None:
     # Read in file to a pandas dataframe (all string values)
     df = read_file(csv_file)
 
@@ -1324,7 +1299,7 @@ def process_file(file: Path):
     print(f"\n******************\n")
     print(f"File being processed is {csv_file}\n")
 
-    final_results = get_final_params_datatypes_formats_fill(csv_file)
+    final_results = get_params_datatypes_formats_fill(csv_file)
 
     if final_results is not None:
         # If multiple formats for param, write info to a log file for referencing
@@ -1360,205 +1335,6 @@ def main():
 
     # TODO
     # Create Test files
-
-    # The following comments are files to check for various issues
-
-    # test 816278_v1_Chlorophyll_a.csv to look if supplied name UTC_Date has
-    # official name in bcodmo_datetimes
-
-    # overflow error
-    # variable name is PAR_doghouse
-    # [val] is ['33970276008492.5937']
-    # if csv_file.name != '3645_v1_underway_met.csv':
-    #     continue
-
-    # Look at Iso time with an offset, not catching it all because of the : at the end
-    # sample time is "2014-04-30T12:16:00-08:00"
-    # for variable ISO_DateTime_Local, most likely is [%Y, -, %m, -, %d, T, %H, :, %H, :, %H, -, %m, :, %H]
-    # decided to use pandas instead but inferred is close but uses Hour12 instead of Hour24
-    # if csv_file.name != '765108_v1_San_Dieguito_Lagoon_Carbon_export.csv':
-    #     continue
-
-    # Problem with guessing the format of date
-    # should be %Y-%m-%d but it says %Y-%d-%m
-    # It should have looked at the whole column and counted probabilities
-    # and if one format is ruled out, don't pick it.
-    # But I'm only using a count of 5 rows, that could be it
-    # When I use 500 rows, it becomes %Y-%d-%m
-    # But also a problem of not realizing a value by
-    # the official name and using pandas
-    # if csv_file.name != '780092_v1_Squidpop_Assay.csv':
-    #     continue
-
-    # has a None parameter name
-    # No parameters info file
-    # if csv_file.name != '709880_v1_Visual_monitoring_of_A__cervicornis.csv':
-    #     continue
-
-    # has a time of format HHMM.SS
-    # if csv_file.name != '3640_v1_OC473_alongtrack.csv':
-    #     continue
-
-    # Iso date ending with .00Z (and need to strip this off for pandas guess)
-    # if csv_file.name != '503133_v1_GP16_CTD___GT_C_Bottle.csv':
-    #     continue
-
-    # time_gmt format wrong, why is a '.' being added?
-    # "time_gmt": 1012.07
-    # "time_gmt": "%Y.%m", should be %H%M.%S
-    # if csv_file.name != '2315_v1_emet_W60_1998.csv':
-    #     continue
-
-    # Only using 5 rows, but
-    # "date_local": "06242010", and get "%Y%d%m" but it should be %m%d%Y
-    # What if I set min year at 1000? or at least 32
-    # if csv_file != '516495_v1_POC_PON_isotopes.csv':
-    #     continue
-
-    # Problem with Iso UTC being null
-    # "ISO_DateTime_UTC": "2018-08-16T14:00:13"
-    # if csv_file.name != '786013_v1_14C_32Si_Experimental.csv':
-    #     continue
-
-    # Problem with iso and + adjustment
-    # "ISO_DateTime_UTC": "2013-05-19T20:53:30+0000"
-    # and no format inferred
-    # if csv_file.name != '3953_v1_event_log.csv':
-    #     continue
-
-    # If NaN, don't put a Z on format
-    # "ISO_DateTime_UTC": "NaNZ"
-    # if csv_file.name != '809945_v1_Lake_Erie_Winter_Surveys_2018_2019.csv':
-    #     continue
-
-    # encoding error when opening as utf-8. fixed now
-    # if csv_file.name != '2472_v1_trawl_catch___GoA.csv':
-    #     continue
-
-    # # error encoding file
-    # if csv_file.name != '3758_v1_alongtrack.csv':
-    #     continue
-
-    # File with quotes in it because of columns within parameter value
-    # if csv_file.name != '717994_v1_Cruise_Event_Log___HRS1415.csv':
-    #     continue
-
-    # File with multiple datetime formats for one parameter
-    # if csv_file.name != '814713_v1_Sulfonates_in_plankton_cultures.csv':
-    #     continue
-
-    # Check z values to see if can find a fill value
-    # Mabe see if all values are positive and have a -9, -99, -999 etc value
-    # So if all positive and one negative value
-    # Put a check in the program looking for values with a series of 9 in them
-    # So split string, get unique set, look only at numeric part and see if value is 9
-
-    # 3358_v1_Bottle_Data.csv
-    # file_list = [file for file in file_list if file.name == "3358_v1_Bottle_Data.csv"]
-
-    # 765327_v1_TORCH_II.csv not saved to output file. why?
-    # file_list = [file for file in file_list if file.name == "765327_v1_TORCH_II.csv"]
-
-    # for file 753036_v1_Lipid_Dendraster_OA_Expt2017.csv, the data type is 'string' for param stomach_area, but there
-    # are float values along with a 'NA' fill. Why is it not float as a final data type? Because the param lipid_area also
-    # has float values and a fill of 'NA', but it is listed as a float type.
-    # Must be a logic error if find string, then all is a string, but if NA is a fill, it's
-    # not a string
-
-    # file with a possible fill
-    # file_list = [
-    #     file
-    #     for file in file_list
-    #     if file.name
-    #     == "644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv"
-    # ]
-
-    # see 644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv
-    # If type is a string, don't look for a fill value
-    # But if see an integer or float value in datatype, look for a fill value.
-    # If fill value is not one of possible fill values list and not a minus 9s value,
-    # the alternate fill value counts as a string and this makes the datatype a
-    # string, even if it's a float
-    # "cell_S": {
-    #     "type": "string",
-    #     "fill_value": "bd"
-    # }
-    # file_list = [
-    #     file
-    #     for file in file_list
-    #     if file.name
-    #     == "644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv"
-    # ]
-
-    # see 815092_v1_Wrack_Composition_and_Abundance.csv
-    # If type is string, don't look for a fill because it could stand
-    # for a value and not a fill value
-    # "Type_Code": {
-    #     "type": "string",
-    #     "fill_value": "NA"
-    # }
-
-    # see 652223_v1_MUSiCC_OC1504A___Bacteria_Virus_and_Chlorophyll_Containing_Cell_Abundance.csv
-    # if have a fill_value that is not one of possible fill values or minus 9s
-    # and datatype is not a string
-    # save it to dict as "alt_fill_value" and save to log parameters_overview.txt
-    # "station": {
-    #     "type": "integer",
-    #     "fill_value": "test2-stn01"
-    # }
-
-    # see 749412_v1_Geltrap_micrographs.csv
-    # Not fine tuning date. Looking at file, it should be %m/%d/%y
-    # "Deploy_Date_UTC": [
-    #     "%m/%d/%y",
-    #     "%d/%m/%y"
-    # ],
-    # file_list = [
-    #     file for file in file_list if file.name == "749412_v1_Geltrap_micrographs.csv"
-    # ]
-
-    # see 3911_v1_CTD_Profiles,csv
-    # Check why format can't be determined
-    # "Time_Local": {
-    #     "type": "date",
-    #     "format": [
-    #         "%Y%m%d",
-    #         "%y%m%d",
-    #         "%m%d%y",
-    #         "%m%d%Y"
-    #     ]
-    # }
-    # has values: 155231, 170025, 60658, 224852
-    # why is %Y%m%d even selected if char length is 6 or less,
-    # should be 8 according to %m%d%Y
-    #
-    # TODO
-    # Have choice of setting datatype back to string and format to None if have
-    # more than one format to choose from
-    # file_list = [file for file in file_list if file.name == "3911_v1_CTD_Profiles.csv"]
-
-    # TODO
-    # check format of %H%M.%f when times are of form 61.88
-    # Need to check if it is of length 4 before the decimal point
-    # file_list = [file for file in file_list if file.name == "734364_v1_Shipboard_bioassay_experiments.csv"]
-    # because for file 3907_v1_lionfish_cleaner_bottle_expt.csv, %H%M.%f makes sense for time of 1038.43
-
-    # 2783_v1_Bigelow_Bight_sm_invertebrates.csv
-    # The parameter date_local has a datetime format but it's data type
-    # is string becomes some of the values end with a ? mark
-
-    # No results returned for this file. Has a pandas parsing error.
-    # Expected 20 fields and saw 21
-    # filename = "3111_v1_MOC_zoop_AK_LTOP.csv"
-
-    # Expect notes field to be string type with NaN fill
-    # but it's not indicating the fill value because I don't
-    # look for a fill in a string column. The idea was maybe
-    # a fill value could be a valid string. But should I just check
-    # for NaN fill at least in a string column?
-    # filename = "811614_v2_GN01_Dissolved_Fe_II_.csv"
-
-    # file_list = [file for file in file_list if file.name == filename]
 
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
