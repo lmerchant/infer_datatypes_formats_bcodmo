@@ -14,23 +14,24 @@ where type is always given, but format and fill_value only appear if these value
 
 The CSV data files are read in as strings to a pandas dataframe to analyze values to prevent pandas from typecasting. This is to prevent a fill value or NaN value from turning an integer column into a float.
 
-The program uses two reference files. Constant values of BCO-DMO datetime variables names are stored in the file bcodmo_datetime_parameters.txt and possible datetime formats to check a column value by are stored in the file possilbe_datetime_formats.txt.
+The program uses two reference files. Constant values of BCO-DMO datetime variables names are stored in the file bcodmo_datetime_parameters.txt and possible datetime formats to check a column value by are stored in the file possible_datetime_formats.txt.
+
+If a data file also has an associated <dataset_id>_parameters.json file, the data file supplied parameters names are mapped to BCO-DMO official names. If it doesn't, the official names are set to the supplied names. If a parameter name is in this list of BCO-DMO official names, it is assumed a datetime type, and it's datetime format is inferred. If a parameter is not in this list, no datetime format is inferred.
 
 Each data file parameter names are checked if they are a datetime parameter name stored in bcodmo_datetime_parameters.txt. If they are, the program will try to infer what the datetime format of the parameter values are. If the csv data file has a corresponding parameters information file, it is used to determine the official BCO-DMO parameter names of a parameter in order to check if it is in the file bcodmo_datetime_parameters.txt.
 
-To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. Along with the predefined set of fill values, it infers a fill value of a series of minus 9s (-999, -999.0 for example) in a numeric column with positive values ore in a datetime column. The program also infers if an alternate fill value is a possibility. The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json.
+To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. Along with the predefined set of fill values, it infers a fill value of a series of minus 9s (-999, -999.0 for example) in a numeric column with positive values ore in a datetime column. The program also infers if an alternate fill value is a possibility (a unique string in a numeric or datetime column that is not a defined possible fill value). The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json.
 
-Possible data types: string, integer, float, datetime, date, time, and null. Null occurs when a column is filled with NaN values.
+Possible data types: string, integer, float, datetime, date, time, and null. Null occurs when a column is filled with NaN values and it can't be clarified as being numeric, datetime, or string parameter.
 
-TODO: Determine data type of a column with only fill values.
+TODO: Determine data type of a column with only fill values (like if a -999 or -999.0 fill) or default to string.
 
 Data type inference order using all column values:
 
 A data type of a parameter column is inferred after removing NaN values and possible fill values from consideration. If a column is entirely a NaN value or entirely a fill value, the data type is null.
 
-The inference is determined by the following: if there is a string value in the column, the whole column is a string. If the parameter name is a BCO-DMO datetime name and it has a datetime format, the data type is one of date, time, or datetime. If there is no string value in a column and it is not a datetime column, if there is a float value, the whole column is a float. If there are no string values, datetimes, or floats, a column type is integer.
+After defined possible fill values are removed, inference is determined by the following: if there is a string value in the column, the whole column is a string. If the parameter official name is a BCO-DMO datetime name listed in bcodmo_datetime_parameters.txt and it has a datetime format, the data type is further calarified to be one of date, time, or datetime. If there is no string value in a column and it is not a datetime column, it is inferred that if there is a float value, the whole column is a float, and if there is no float value, the column is an integer.
 
-If a parameter has an official datetime type name, it is checked as a date, time, or datetime type.
 
 Datetime format inference
 
@@ -1343,6 +1344,8 @@ def main():
     files = Path(top_data_folder).glob("**/dataURL/*.csv")
 
     file_list = list(files)
+
+    file_list = file_list[0:200]
 
     # TODO
     # Create Test files
