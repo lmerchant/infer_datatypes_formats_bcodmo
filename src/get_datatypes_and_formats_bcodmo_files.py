@@ -1584,23 +1584,6 @@ def get_params_datatypes_formats_fill(csv_file: str) -> dict | None:
         with open(log_no_results_file, "a") as f:
             f.write(f"{csv_file}\n")
 
-    # # Fine tune results to get one format and one datatype
-    # if results is not None:
-    #     try:
-    #         final_results = infer_values_second_pass(results, parameter_official_names)
-    #     except:
-    #         final_results = None
-    # else:
-    #     final_results = None
-
-    #     print(f"{csv_file} has no results")
-    #     with open(log_no_results_file, "a") as f:
-    #         f.write(f"{csv_file}\n")
-
-    # Use results (values for each row and col) and final results (values for each col) to determine fill values
-    # if results and final_results:
-    #     final_results = determine_fill_values(results, final_results)
-
     return final_results
 
 
