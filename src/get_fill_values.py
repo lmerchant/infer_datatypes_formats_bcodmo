@@ -372,7 +372,6 @@ def get_numeric_datetime_fill_values(
             and not len(found_possible_fill_values)
             and not len(string_values)
         ):
-            print(f"**minus 9s {minus_9s}")
             fill_value = check_numeric_minus_9s_fill_value(
                 col_name, minus_9s, numeric_values
             )

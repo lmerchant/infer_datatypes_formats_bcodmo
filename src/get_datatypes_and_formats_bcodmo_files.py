@@ -1627,8 +1627,6 @@ def main():
 
     file_list = list(files)
 
-    file_list = file_list[0:100]
-
     # TODO
     # Create Test files
 
