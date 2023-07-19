@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    #restart: unless-stopped
+    command: python3 -u get_datatypes_and_formats_bcodmo_files.py
+    env_file:
+      - ".env"
+    container_name: infer_types
+    volumes:
+      - ./src:/app/src
+      - ${DATA_DIR}:/app/data
+      - ${LOG_DIR}:/app/logs
+      - ${OUTPUT_DIR}:/app/output
+
