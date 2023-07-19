@@ -107,6 +107,7 @@ NUMBER_TESTING_ROWS = 5
 
 # Set names of folders and files used
 top_data_folder = f"../data"
+# top_data_folder = f"/data"
 
 parameters_overview_file = "../logs/parameters_overview.txt"
 parameters_summary_file = "../output/parameters_summary.json"
@@ -1626,6 +1627,8 @@ def main():
     files = Path(top_data_folder).glob("**/dataURL/*.csv")
 
     file_list = list(files)
+
+    # file_list = file_list[0:20]
 
     # TODO
     # Create Test files
