@@ -20,7 +20,7 @@ If a data file also has an associated <dataset_id>_parameters.json file, the dat
 
 Each data file parameter names are checked if they are a datetime parameter name stored in bcodmo_datetime_parameters.txt. If they are, the program will try to infer what the datetime format of the parameter values are. If the csv data file has a corresponding parameters information file, it is used to determine the official BCO-DMO parameter names of a parameter in order to check if it is in the file bcodmo_datetime_parameters.txt.
 
-To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. Along with the predefined set of fill values, it infers a fill value of a series of minus 9s (-999, -999.0 for example) in a numeric column with positive values ore in a datetime column. The program also infers if an alternate fill value is a possibility (a unique string in a numeric or datetime column that is not a defined possible fill value). The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json.
+To infer if a parameter value is a fill value, a list of possible BCO-DMO data fill values defined in a list is checked. Along with the predefined set of fill values, it infers a fill value of a series of minus 9s (-999, -999.0 for example) in a numeric column with positive values ore in a datetime column. The program also infers if an alternate fill value is a possibility (a unique string in a numeric column that is not a defined possible fill value). The alternate fill values are indicated in the log file called parameters_overview.txt, but are not included in the output file parameters_summary.json. Currently, unique strings in a datetime column are not inferred.
 
 Possible data types: string, integer, float, datetime, date, and time.
 
@@ -835,7 +835,29 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
         and "%H:%M:%S%f" in unique_formats
         and len(unique_formats) == 2
     ):
-        out_format = "%H:%M:%S%f"
+        seconds_pieces = []
+
+        for val in col_vals:
+            pieces = val.split(":")
+
+            try:
+                seconds_pieces.append(pieces[2])
+            except:
+                pass
+
+        # check if seconds piece length > 2. then need %f piece of format
+        vals = [val for val in seconds_pieces if len(val) > 2]
+
+        if len(vals):
+            has_microseconds = True
+        else:
+            has_microseconds = False
+
+        if has_microseconds:
+            out_format = "%H:%M:%S%f"
+        else:
+            out_format = "%H:%M:%S"
+
         out_formats = [out_format]
 
     # Check various time formats
