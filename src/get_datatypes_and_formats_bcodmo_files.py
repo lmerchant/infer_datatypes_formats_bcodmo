@@ -103,7 +103,7 @@ from get_fill_values import *
 
 # Set this to True if want to use program with just a subset of rows in files
 TESTING = False
-NUMBER_TESTING_ROWS = 5
+NUMBER_TESTING_ROWS = 800
 
 # Set names of folders and files used
 top_data_folder = f"../data"
@@ -851,107 +851,107 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
     return out_formats
 
 
-def get_parameter_unique_datatypes(
-    col_name: str,
-    col_values: list,
-    datatypes: list,
-    parameter_formats: list,
-    parameter_official_names: dict,
-) -> list:
-    """
-    Fine tune whether a datetime type is date, time, or datetime
-    Need to know what the format looks like,
-    If it has H,M, or S in it, and no other letters, it's a time
-    If it has no H,M,S, it's a date
+# def get_parameter_unique_datatypes(
+#     col_name: str,
+#     col_values: list,
+#     datatypes: list,
+#     parameter_formats: list,
+#     parameter_official_names: dict,
+# ) -> list:
+#     """
+#     Fine tune whether a datetime type is date, time, or datetime
+#     Need to know what the format looks like,
+#     If it has H,M, or S in it, and no other letters, it's a time
+#     If it has no H,M,S, it's a date
 
-    Returns:
-        list: unique_datatypes
-    """
+#     Returns:
+#         list: unique_datatypes
+#     """
 
-    name_in_bcodmo_datetimes = get_is_name_in_bcodmo_datetime_vars(
-        col_name, parameter_official_names
-    )
+#     name_in_bcodmo_datetimes = get_is_name_in_bcodmo_datetime_vars(
+#         col_name, parameter_official_names
+#     )
 
-    time_format_letters = ["H", "M", "S", "f"]
+#     time_format_letters = ["H", "M", "S", "f"]
 
-    alphabet = string.ascii_lowercase + string.ascii_uppercase
-    date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
+#     alphabet = string.ascii_lowercase + string.ascii_uppercase
+#     date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
 
-    date_format_letters = list(date_format_letters)
+#     date_format_letters = list(date_format_letters)
 
-    new_datatypes = []
+#     new_datatypes = []
 
-    for i in range(len(datatypes)):
-        elem_datatype = datatypes[i]
-        elem_format = parameter_formats[i]
-        col_val = col_values[i]
+#     for i in range(len(datatypes)):
+#         elem_datatype = datatypes[i]
+#         elem_format = parameter_formats[i]
+#         col_val = col_values[i]
 
-        if elem_format is not None and elem_datatype == "datetime":
-            datatype_letters = re.split(r"[^a-zA-Z]*", elem_format)
+#         if elem_format is not None and elem_datatype == "datetime":
+#             datatype_letters = re.split(r"[^a-zA-Z]*", elem_format)
 
-            common_time_letters = list(set(time_format_letters) & set(datatype_letters))
+#             common_time_letters = list(set(time_format_letters) & set(datatype_letters))
 
-            common_date_letters = list(set(date_format_letters) & set(datatype_letters))
+#             common_date_letters = list(set(date_format_letters) & set(datatype_letters))
 
-            if (
-                common_time_letters
-                and not common_date_letters
-                and name_in_bcodmo_datetimes
-            ):
-                elem_datatype = "time"
+#             if (
+#                 common_time_letters
+#                 and not common_date_letters
+#                 and name_in_bcodmo_datetimes
+#             ):
+#                 elem_datatype = "time"
 
-            elif (
-                not common_time_letters
-                and common_date_letters
-                and name_in_bcodmo_datetimes
-            ):
-                elem_datatype = "date"
+#             elif (
+#                 not common_time_letters
+#                 and common_date_letters
+#                 and name_in_bcodmo_datetimes
+#             ):
+#                 elem_datatype = "date"
 
-            else:
-                elem_datatype = "datetime"
+#             else:
+#                 elem_datatype = "datetime"
 
-            new_datatypes.append(elem_datatype)
+#             new_datatypes.append(elem_datatype)
 
-        elif elem_format is None and elem_datatype == "datetime":
-            # keep datatype datetime and if format = None,
-            # go through list of options to find the datatype
-            # Would need the col value to do this
+#         elif elem_format is None and elem_datatype == "datetime":
+#             # keep datatype datetime and if format = None,
+#             # go through list of options to find the datatype
+#             # Would need the col value to do this
 
-            possible_fill_values = get_possible_fill_values()
+#             possible_fill_values = get_possible_fill_values()
 
-            if col_val in possible_fill_values:
-                datatype = "isfill"
-            else:
-                try:
-                    val_float = float(col_val)
+#             if col_val in possible_fill_values:
+#                 datatype = "isfill"
+#             else:
+#                 try:
+#                     val_float = float(col_val)
 
-                    if math.isnan(val_float):
-                        datatype = "isnan"
-                    elif "." not in col_val:
-                        datatype = "integer"
-                    else:
-                        datatype = "float"
-                except:
-                    datatype = "string"
+#                     if math.isnan(val_float):
+#                         datatype = "isnan"
+#                     elif "." not in col_val:
+#                         datatype = "integer"
+#                     else:
+#                         datatype = "float"
+#                 except:
+#                     datatype = "string"
 
-            new_datatypes.append(datatype)
+#             new_datatypes.append(datatype)
 
-        else:
-            new_datatypes.append(elem_datatype)
+#         else:
+#             new_datatypes.append(elem_datatype)
 
-    unique_datatypes = list(set(new_datatypes))
+#     unique_datatypes = list(set(new_datatypes))
 
-    unique_datatypes = [elem for elem in unique_datatypes if elem]
+#     unique_datatypes = [elem for elem in unique_datatypes if elem]
 
-    # If there is a fill datatype, remove it to determine the datatype of remaining
-    if len(unique_datatypes) == 1 and "isfill" in unique_datatypes:
-        # All values are fill.
-        unique_datatypes = ["string"]
+#     # If there is a fill datatype, remove it to determine the datatype of remaining
+#     if len(unique_datatypes) == 1 and "isfill" in unique_datatypes:
+#         # All values are fill.
+#         unique_datatypes = ["string"]
 
-    elif len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
-        unique_datatypes.remove("isfill")
+#     elif len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
+#         unique_datatypes.remove("isfill")
 
-    return unique_datatypes
+#     return unique_datatypes
 
 
 def get_parameter_unique_datatypes(
@@ -988,7 +988,12 @@ def get_parameter_unique_datatypes(
     for i in range(len(datatypes)):
         elem_datatype = datatypes[i]
 
-        elem_format = formats[i]
+        elem_formats = formats[i]
+
+        if len(elem_formats) == 1:
+            elem_format = elem_formats[0]
+        else:
+            elem_format = " ".join(elem_formats)
 
         elem_fill = fills[i]
 
@@ -1069,100 +1074,100 @@ def get_parameter_unique_datatypes(
     return unique_datatypes
 
 
-def infer_values_second_pass(results: dict, parameter_official_names: dict) -> dict:
-    """_summary_
+# def infer_values_second_pass(results: dict, parameter_official_names: dict) -> dict:
+#     """_summary_
 
-    Returns:
-        _type_: _description_
-    """
+#     Returns:
+#         _type_: _description_
+#     """
 
-    column_names = list(results.keys())
+#     column_names = list(results.keys())
 
-    final_results = {}
+#     final_results = {}
 
-    for col_name in column_names:
-        final_results[col_name] = {}
+#     for col_name in column_names:
+#         final_results[col_name] = {}
 
-        col_values = results[col_name]["col_values"]
-        final_results[col_name]["col_values"] = col_values
+#         col_values = results[col_name]["col_values"]
+#         final_results[col_name]["col_values"] = col_values
 
-        datatypes = results[col_name]["col_datatypes"]
+#         datatypes = results[col_name]["col_datatypes"]
 
-        parameter_formats = results[col_name]["col_formats"]
+#         parameter_formats = results[col_name]["col_formats"]
 
-        # Find unique datatypes from looking at each parameter datatype and format
-        # unique_datatypes may be None if the format for a value is None but has a datetime datatype
-        # Will analyze this None datatype later to determine it
+#         # Find unique datatypes from looking at each parameter datatype and format
+#         # unique_datatypes may be None if the format for a value is None but has a datetime datatype
+#         # Will analyze this None datatype later to determine it
 
-        # TODO, change this behavior to keep datatype datetime and if format = None,
-        # go through list of options to find the datatype
+#         # TODO, change this behavior to keep datatype datetime and if format = None,
+#         # go through list of options to find the datatype
 
-        unique_datatypes = get_parameter_unique_datatypes(
-            col_name,
-            col_values,
-            datatypes,
-            parameter_formats,
-            parameter_official_names,
-        )
+#         unique_datatypes = get_parameter_unique_datatypes(
+#             col_name,
+#             col_values,
+#             datatypes,
+#             parameter_formats,
+#             parameter_official_names,
+#         )
 
-        # Get unique parameter formats
+#         # Get unique parameter formats
 
-        if len(parameter_formats):
-            unique_formats = list(set(parameter_formats))
+#         if len(parameter_formats):
+#             unique_formats = list(set(parameter_formats))
 
-            # Remove any None formats that could occur if a column value
-            # can't fit a dateformat or if their is a fill. Since it could
-            # be from a fill value, infer if it's a datetime later.  It could
-            # still be a datetime if None values from fill values but could
-            # be a non datetime datatype if not a fill value meaning the
-            # dateformat couldn't be matched
-            unique_formats = [val for val in unique_formats if val]
+#             # Remove any None formats that could occur if a column value
+#             # can't fit a dateformat or if their is a fill. Since it could
+#             # be from a fill value, infer if it's a datetime later.  It could
+#             # still be a datetime if None values from fill values but could
+#             # be a non datetime datatype if not a fill value meaning the
+#             # dateformat couldn't be matched
+#             unique_formats = [val for val in unique_formats if val]
 
-            if not unique_formats:
-                unique_formats = None
-        else:
-            unique_formats = None
+#             if not unique_formats:
+#                 unique_formats = None
+#         else:
+#             unique_formats = None
 
-        # If more than one format, see if can fine-tune to one best format
-        if unique_formats is not None:
-            unique_formats = fine_tune_datetime_formats(col_values, unique_formats)
+#         # If more than one format, see if can fine-tune to one best format
+#         if unique_formats is not None:
+#             unique_formats = fine_tune_datetime_formats(col_values, unique_formats)
 
-        # If there are still more than one unique_format even after fine tuning,
-        # set the unique_format to None and change the datatype to an
-        # integer, float, or string
-        # depending on the formats.
-        # A case is when a time parameter is of the form HHMMSS but is
-        # indistinguishable from multiple date formats.
-        # For example, it could have both formats "%Y%m%d" and "%m%d%Y".
-        # Since 'time' is in the parameter name, it should not be a date format
-        # but a time format.
+#         # If there are still more than one unique_format even after fine tuning,
+#         # set the unique_format to None and change the datatype to an
+#         # integer, float, or string
+#         # depending on the formats.
+#         # A case is when a time parameter is of the form HHMMSS but is
+#         # indistinguishable from multiple date formats.
+#         # For example, it could have both formats "%Y%m%d" and "%m%d%Y".
+#         # Since 'time' is in the parameter name, it should not be a date format
+#         # but a time format.
 
-        final_format = None
+#         final_format = None
 
-        if unique_formats is not None and len(unique_formats) > 1:
-            unique_datatypes = get_datatypes_from_formats(unique_formats)
-            final_format = None
+#         if unique_formats is not None and len(unique_formats) > 1:
+#             unique_datatypes = get_datatypes_from_formats(unique_formats)
+#             final_format = None
 
-        elif unique_formats is not None and len(unique_formats) == 1:
-            final_format = unique_formats[0]
+#         elif unique_formats is not None and len(unique_formats) == 1:
+#             final_format = unique_formats[0]
 
-        # TODO
-        # If the unique datatypes include string and datetime,
-        # the final datatype will be string, but the format will still exist
-        # because some of the column values have a datetime format. In this
-        # case, should the datetime format become None?
-        final_datatype = get_parameter_final_datatype(unique_datatypes)
+#         # TODO
+#         # If the unique datatypes include string and datetime,
+#         # the final datatype will be string, but the format will still exist
+#         # because some of the column values have a datetime format. In this
+#         # case, should the datetime format become None?
+#         final_datatype = get_parameter_final_datatype(unique_datatypes)
 
-        # Check if a datetime datatype has an expected length and if not
-        # return a new format and datatype
-        final_format, final_datatype = check_datetime_format_and_datatype(
-            col_values, final_format, final_datatype
-        )
+#         # Check if a datetime datatype has an expected length and if not
+#         # return a new format and datatype
+#         final_format, final_datatype = check_datetime_format_and_datatype(
+#             col_values, final_format, final_datatype
+#         )
 
-        final_results[col_name]["final_format"] = final_format
-        final_results[col_name]["final_datatype"] = final_datatype
+#         final_results[col_name]["final_format"] = final_format
+#         final_results[col_name]["final_datatype"] = final_datatype
 
-    return final_results
+#     return final_results
 
 
 def infer_values_second_pass(results: dict, parameter_official_names: dict) -> dict:
@@ -1183,6 +1188,9 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
         datatypes = results[col_name]["col_datatypes"]
         formats = results[col_name]["col_formats"]
         all_fill_values = results[col_name]["col_all_fill_values"]
+        all_possible_and_minus9s_fills = results[col_name][
+            "col_all_possible_and_minus9s_fills"
+        ]
         fill = results[col_name]["col_fill_value"]
         alt_fill = results[col_name]["col_alt_fill_value"]
 
@@ -1202,14 +1210,16 @@ def infer_values_second_pass(results: dict, parameter_official_names: dict) -> d
             col_values,
             datatypes,
             formats,
-            all_fill_values,
+            all_possible_and_minus9s_fills,
             parameter_official_names,
         )
 
         # Get unique parameter formats
+        # simplify list of lists
+        parameter_datetime_formats = [item for sublist in formats for item in sublist]
 
-        if len(formats):
-            unique_formats = list(set(formats))
+        if len(parameter_datetime_formats):
+            unique_formats = list(set(parameter_datetime_formats))
 
             # Remove any None formats that could occur if a column value
             # can't fit a dateformat or if their is a fill. Since it could
@@ -1303,12 +1313,18 @@ def get_col_val_datetime_formats(
 def get_col_value_datatype(
     col_val: str, possible_fill_values: list, is_datetime: bool
 ) -> str:
-    """_summary_
+    """
+    First check if a column value is a possible fill value.
+    Then check if a parameter official name is an
+    indicator of a datatype datetime. And if the parameter
+    name is not a datetime, infer a datatype that is a
+    numeric, or a string value.
 
     Returns:
         str: datatype
     """
-    # Mark as a fill value before marking as a string or datetime
+
+    # Mark as a fill value before marking as another datatype
     if col_val in possible_fill_values:
         datatype = "isfill"
     elif is_datetime:
@@ -1331,7 +1347,9 @@ def get_col_value_datatype(
 
 # Testing option included in function to limit number of rows to process
 def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) -> dict:
-    """_summary_
+    """
+    First pass of classifying each column value before finding final
+    values of a datatype, datetime format and fill value for the whole column.
 
     Returns:
         dict: results
@@ -1358,6 +1376,8 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
         else:
             is_datetime = False
 
+        # Get the defined possible fill values that
+        # BCO-DMO datasets use
         possible_fill_values = get_possible_fill_values()
 
         parameter_datatypes = []
@@ -1374,26 +1394,33 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
             # Remove any spaces that a column value might have
             col_val = col_val.strip()
 
+            # Get the datatype of each column value.
             datatype = get_col_value_datatype(
                 col_val, possible_fill_values, is_datetime
             )
 
             parameter_datatypes.append(datatype)
 
+            # One value can have more than one format that fits it
+            # Get possible datetime formats for each column value.
+            # Later on will fine tune a column datetime format
+            # from a unique set of the column value formats.
             datetime_formats = get_col_val_datetime_formats(
                 col_val, is_name_in_bcodmo_datetime_vars
             )
 
             param_datetime_formats.append(datetime_formats)
 
-        # Expand list of lists
+        # Expand the list of each list of possible datetime formats
+        # that were found for each column value
         parameter_datetime_formats = [
             item for sublist in param_datetime_formats for item in sublist
         ]
 
         results[col_name]["col_values"] = col_vals
         results[col_name]["col_datatypes"] = parameter_datatypes
-        results[col_name]["col_formats"] = parameter_datetime_formats
+        # results[col_name]["col_formats"] = parameter_datetime_formats
+        results[col_name]["col_formats"] = param_datetime_formats
         results[col_name]["is_datetime"] = is_datetime
 
     return results
@@ -1560,19 +1587,31 @@ def get_params_datatypes_formats_fill(csv_file: str) -> dict | None:
     # datetime (time, date, datetime)
     parameter_official_names = get_parameters_official_names(csv_file, column_names)
 
-    # Do a first pass of inferring to get lists of unique values of
-    # format, datatype and fill value for each row in column.
-    # Also retrieve the column values into a results dict
+    # Do a first pass of inferring to get the format, datatype and
+    # fill value for each value in a column.
+    # And include the column values into a results dict.
+    # If a parameter official name is a datetime datatype,
     if not df.empty:
         results = infer_values_first_pass(df, parameter_official_names)
 
     else:
         results = None
 
+    # Get a list of fill values that are either one of the
+    # defined possible fill values or a minus 9s fill. And
+    # also look for unique string values in a numeric or
+    # datetime column that could be a fill value not included
+    # in the defined list of fill values used in datasets.
     if results is not None:
         results = determine_fill_values(results)
 
     # Fine tune results to get one format, one datatype and one fill value
+    # Fine tune to determine if a column determined to be
+    # datatype datetime using parameter official name will remain
+    # a datatype datetime column.
+    # And finetune if there is a string value in a numeric column
+    # that is not a fill value that the column is a string type.
+    # otherwise determine if have an integer or float column.
     if results is not None:
         try:
             final_results = infer_values_second_pass(results, parameter_official_names)
@@ -1628,7 +1667,7 @@ def main():
 
     file_list = list(files)
 
-    # file_list = file_list[0:20]
+    file_list = file_list[0:100]
 
     # TODO
     # Create Test files
@@ -1641,6 +1680,7 @@ def main():
     start_time = time.time()
 
     PROCESSES = num_cores - 2
+
     with multiprocessing.Pool(PROCESSES) as pool:
         pool.map(process_file, file_list)
 
