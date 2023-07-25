@@ -1067,7 +1067,7 @@ def get_col_val_datetime_formats(
     # return None
 
     # TODO
-    # If parameter is a datetiem and its format is None, write to a log file
+    # If parameter is a datetime and its format is None, write to a log file
     # because most likely that format is not in the list of datetime formats to match to
 
     parsed_timestamps = {"col_val": col_val, "matches": []}
@@ -1195,15 +1195,8 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
 
             param_datetime_formats.append(datetime_formats)
 
-        # Expand the list of each list of possible datetime formats
-        # that were found for each column value
-        parameter_datetime_formats = [
-            item for sublist in param_datetime_formats for item in sublist
-        ]
-
         results[col_name]["col_values"] = col_vals
         results[col_name]["col_datatypes"] = parameter_datatypes
-        # results[col_name]["col_formats"] = parameter_datetime_formats
         results[col_name]["col_formats"] = param_datetime_formats
         results[col_name]["is_datetime"] = is_datetime
 
@@ -1374,7 +1367,6 @@ def get_params_datatypes_formats_fill(csv_file: str) -> dict | None:
     # Do a first pass of inferring to get the format, datatype and
     # fill value for each value in a column.
     # And include the column values into a results dict.
-    # If a parameter official name is a datetime datatype,
     if not df.empty:
         results = infer_values_first_pass(df, parameter_official_names)
 
