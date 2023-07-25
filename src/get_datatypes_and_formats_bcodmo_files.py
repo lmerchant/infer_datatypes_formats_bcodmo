@@ -24,7 +24,13 @@ To infer if a parameter value is a fill value, a list of possible BCO-DMO data f
 
 Possible data types: string, integer, float, datetime, date, and time.
 
-TODO: Determine data type of a column with only fill values (like if a -999 or -999.0 fill) or default to string.
+TODO: Determine data type of a column with only fill values (like if a -999 or -999.0 fill) or default to string. Or if a column is only NaN which can occur for
+numeric and string columns
+
+when numeric column is all fill, it's datatype is 'string',
+but what about when fill value is a numeric minus 9s value? It'S
+most likely a numeric column but can't tell if it float or integer
+
 
 Data type inference order using all column values:
 
@@ -36,14 +42,13 @@ After defined possible fill values are removed, inference is determined by the f
 Datetime format inference
 
 Some datetime formats are not included.
-
-%m%d%y is not included because it is difficult to distinguish unless two digit year
-is greater than 31 so that it can't be a month or day. And can't distinguish if the
-format could be %y%m%d. If assumed only format possible is %m%d%y and it's not a time
+Like %m%d%y is not included because it is difficult to distinguish
+unless two digit year is greater than 31 so that it can't be a
+month or day. And can't distinguish if the format could be %y%m%d.
+If assumed only format possible is %m%d%y and it's not a time
 datatype (which is currently only determined from the format and not the official time names),
 one could check if the first two digits or the second two digits is a day
 to determine positioning of the day and month values
-
 
 """
 
@@ -365,64 +370,6 @@ def check_datetime_format_and_datatype(
         is_datetime = datatype == "datetime" or datatype == "time" or datatype == "date"
     else:
         is_datetime = False
-
-    if format == "%H%M" or format == "%H%M.%f" and is_datetime:
-        # check that the numeric length is 4 before the decimal point
-        # to match format %H%M which implies two char Hour and two char Minutes
-
-        first_piece = []
-        second_piece = []
-
-        for val in col_vals:
-            pieces = val.split(".")
-            try:
-                if len(pieces[0]) != 4:
-                    continue
-                first_piece.append(int(pieces[0]))
-                second_piece.append(int(pieces[1]))
-            except:
-                pass
-
-        if len(first_piece) and not len(second_piece):
-            out_format = "%H%M"
-            out_datatype = "time"
-        elif len(first_piece) and len(second_piece):
-            out_format = "%H%M.%f"
-            out_datatype = "time"
-        elif not len(first_piece) and not len(second_piece):
-            out_format = None
-            out_datatype = "integer"
-        elif not len(first_piece) and len(second_piece):
-            out_format = None
-            out_datatype = "float"
-
-    return out_format, out_datatype
-
-
-def check_datetime_format_and_datatype(
-    col_vals: list, format: str | None, datatype: str | None
-) -> tuple:
-    """
-    Look at certain formats and check length of column values based on
-    datetime format. If it doesn't match, reinterpret datatype.
-    If the length doesn't match, it's not a datetime format,
-    so determine what type it is.
-
-    Returns:
-        str | None: out_format
-        str: out_datatype
-    """
-
-    out_datatype = datatype
-    out_format = format
-
-    if format is not None and datatype is not None:
-        is_datetime = datatype == "datetime" or datatype == "time" or datatype == "date"
-    else:
-        is_datetime = False
-
-    if not is_datetime:
-        out_format = None
 
     if format == "%H%M" or format == "%H%M.%f" and is_datetime:
         # check that the numeric length is 4 before the decimal point
@@ -873,109 +820,6 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
     return out_formats
 
 
-# def get_parameter_unique_datatypes(
-#     col_name: str,
-#     col_values: list,
-#     datatypes: list,
-#     parameter_formats: list,
-#     parameter_official_names: dict,
-# ) -> list:
-#     """
-#     Fine tune whether a datetime type is date, time, or datetime
-#     Need to know what the format looks like,
-#     If it has H,M, or S in it, and no other letters, it's a time
-#     If it has no H,M,S, it's a date
-
-#     Returns:
-#         list: unique_datatypes
-#     """
-
-#     name_in_bcodmo_datetimes = get_is_name_in_bcodmo_datetime_vars(
-#         col_name, parameter_official_names
-#     )
-
-#     time_format_letters = ["H", "M", "S", "f"]
-
-#     alphabet = string.ascii_lowercase + string.ascii_uppercase
-#     date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
-
-#     date_format_letters = list(date_format_letters)
-
-#     new_datatypes = []
-
-#     for i in range(len(datatypes)):
-#         elem_datatype = datatypes[i]
-#         elem_format = parameter_formats[i]
-#         col_val = col_values[i]
-
-#         if elem_format is not None and elem_datatype == "datetime":
-#             datatype_letters = re.split(r"[^a-zA-Z]*", elem_format)
-
-#             common_time_letters = list(set(time_format_letters) & set(datatype_letters))
-
-#             common_date_letters = list(set(date_format_letters) & set(datatype_letters))
-
-#             if (
-#                 common_time_letters
-#                 and not common_date_letters
-#                 and name_in_bcodmo_datetimes
-#             ):
-#                 elem_datatype = "time"
-
-#             elif (
-#                 not common_time_letters
-#                 and common_date_letters
-#                 and name_in_bcodmo_datetimes
-#             ):
-#                 elem_datatype = "date"
-
-#             else:
-#                 elem_datatype = "datetime"
-
-#             new_datatypes.append(elem_datatype)
-
-#         elif elem_format is None and elem_datatype == "datetime":
-#             # keep datatype datetime and if format = None,
-#             # go through list of options to find the datatype
-#             # Would need the col value to do this
-
-#             possible_fill_values = get_possible_fill_values()
-
-#             if col_val in possible_fill_values:
-#                 datatype = "isfill"
-#             else:
-#                 try:
-#                     val_float = float(col_val)
-
-#                     if math.isnan(val_float):
-#                         datatype = "isnan"
-#                     elif "." not in col_val:
-#                         datatype = "integer"
-#                     else:
-#                         datatype = "float"
-#                 except:
-#                     datatype = "string"
-
-#             new_datatypes.append(datatype)
-
-#         else:
-#             new_datatypes.append(elem_datatype)
-
-#     unique_datatypes = list(set(new_datatypes))
-
-#     unique_datatypes = [elem for elem in unique_datatypes if elem]
-
-#     # If there is a fill datatype, remove it to determine the datatype of remaining
-#     if len(unique_datatypes) == 1 and "isfill" in unique_datatypes:
-#         # All values are fill.
-#         unique_datatypes = ["string"]
-
-#     elif len(unique_datatypes) > 1 and "isfill" in unique_datatypes:
-#         unique_datatypes.remove("isfill")
-
-#     return unique_datatypes
-
-
 def get_parameter_unique_datatypes(
     col_name: str,
     col_values: list,
@@ -998,8 +842,10 @@ def get_parameter_unique_datatypes(
         col_name, parameter_official_names
     )
 
+    # Don't include Z format
     time_format_letters = ["H", "M", "S", "f"]
 
+    # Don't include Z format
     alphabet = string.ascii_lowercase + string.ascii_uppercase
     date_format_letters = alphabet.translate({ord(letter): None for letter in "HMSfzZ"})
 
