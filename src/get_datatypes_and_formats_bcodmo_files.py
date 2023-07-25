@@ -814,7 +814,19 @@ def fine_tune_datetime_formats(col_vals: list, unique_formats: list) -> list:
         and "%H%M.%f" in unique_formats
         and len(unique_formats) == 2
     ):
-        out_format = "%H%M.%f"
+        # Check if there is a decimal point
+        vals = [val for val in col_vals if "." in val]
+
+        if len(vals):
+            has_microseconds = True
+        else:
+            has_microseconds = False
+
+        if has_microseconds:
+            out_format = "%H%M.%f"
+        else:
+            out_format = "%H%M"
+
         out_formats = [out_format]
 
     return out_formats
@@ -940,102 +952,6 @@ def get_parameter_unique_datatypes(
         unique_datatypes.remove("isfill")
 
     return unique_datatypes
-
-
-# def infer_values_second_pass(results: dict, parameter_official_names: dict) -> dict:
-#     """_summary_
-
-#     Returns:
-#         _type_: _description_
-#     """
-
-#     column_names = list(results.keys())
-
-#     final_results = {}
-
-#     for col_name in column_names:
-#         final_results[col_name] = {}
-
-#         col_values = results[col_name]["col_values"]
-#         final_results[col_name]["col_values"] = col_values
-
-#         datatypes = results[col_name]["col_datatypes"]
-
-#         parameter_formats = results[col_name]["col_formats"]
-
-#         # Find unique datatypes from looking at each parameter datatype and format
-#         # unique_datatypes may be None if the format for a value is None but has a datetime datatype
-#         # Will analyze this None datatype later to determine it
-
-#         # TODO, change this behavior to keep datatype datetime and if format = None,
-#         # go through list of options to find the datatype
-
-#         unique_datatypes = get_parameter_unique_datatypes(
-#             col_name,
-#             col_values,
-#             datatypes,
-#             parameter_formats,
-#             parameter_official_names,
-#         )
-
-#         # Get unique parameter formats
-
-#         if len(parameter_formats):
-#             unique_formats = list(set(parameter_formats))
-
-#             # Remove any None formats that could occur if a column value
-#             # can't fit a dateformat or if their is a fill. Since it could
-#             # be from a fill value, infer if it's a datetime later.  It could
-#             # still be a datetime if None values from fill values but could
-#             # be a non datetime datatype if not a fill value meaning the
-#             # dateformat couldn't be matched
-#             unique_formats = [val for val in unique_formats if val]
-
-#             if not unique_formats:
-#                 unique_formats = None
-#         else:
-#             unique_formats = None
-
-#         # If more than one format, see if can fine-tune to one best format
-#         if unique_formats is not None:
-#             unique_formats = fine_tune_datetime_formats(col_values, unique_formats)
-
-#         # If there are still more than one unique_format even after fine tuning,
-#         # set the unique_format to None and change the datatype to an
-#         # integer, float, or string
-#         # depending on the formats.
-#         # A case is when a time parameter is of the form HHMMSS but is
-#         # indistinguishable from multiple date formats.
-#         # For example, it could have both formats "%Y%m%d" and "%m%d%Y".
-#         # Since 'time' is in the parameter name, it should not be a date format
-#         # but a time format.
-
-#         final_format = None
-
-#         if unique_formats is not None and len(unique_formats) > 1:
-#             unique_datatypes = get_datatypes_from_formats(unique_formats)
-#             final_format = None
-
-#         elif unique_formats is not None and len(unique_formats) == 1:
-#             final_format = unique_formats[0]
-
-#         # TODO
-#         # If the unique datatypes include string and datetime,
-#         # the final datatype will be string, but the format will still exist
-#         # because some of the column values have a datetime format. In this
-#         # case, should the datetime format become None?
-#         final_datatype = get_parameter_final_datatype(unique_datatypes)
-
-#         # Check if a datetime datatype has an expected length and if not
-#         # return a new format and datatype
-#         final_format, final_datatype = check_datetime_format_and_datatype(
-#             col_values, final_format, final_datatype
-#         )
-
-#         final_results[col_name]["final_format"] = final_format
-#         final_results[col_name]["final_datatype"] = final_datatype
-
-#     return final_results
 
 
 def infer_values_second_pass(results: dict, parameter_official_names: dict) -> dict:
