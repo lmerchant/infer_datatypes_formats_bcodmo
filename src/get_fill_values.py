@@ -206,7 +206,6 @@ def check_numeric_minus_9s_fill_value(
     fill_value = None
 
     found_9s_fill = list(set(minus_9s))
-    print(f"{col_name} possible minus 9s fill {found_9s_fill}")
 
     # Don't set as a fill value if there are multiple versions of a minus_9s fill
     if len(found_9s_fill) == 1:
