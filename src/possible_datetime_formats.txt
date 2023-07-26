@@ -109,6 +109,7 @@ datetime_formats
 %m-%d-%Y %H:%M
 %m/%d/%y %H:%M
 %d-%B-%y
+%d-%b-%y
 %m/%d/%Y
 %Y-%m-%dT%H:%M
 %Y-%m-%dT%H:%M%z
