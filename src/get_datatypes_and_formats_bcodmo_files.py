@@ -108,7 +108,7 @@ from get_fill_values import *
 
 # Set this to True if want to use program with just a subset of rows in files
 TESTING = False
-NUMBER_TESTING_ROWS = 1000
+NUMBER_TESTING_ROWS = 10000
 
 # Set names of folders and files used
 top_data_folder = f"../data"
@@ -419,10 +419,10 @@ def get_parameter_final_datatype(unique_datatypes: list) -> str | None:
     # NaN values when determining the data type
     final_datatype = None
 
-    if "isnan" in unique_datatypes:
-        unique_datatypes.remove("isnan")
-        if not len(unique_datatypes):
-            final_datatype = None
+    # if "isnan" in unique_datatypes:
+    #     unique_datatypes.remove("isnan")
+    #     if not len(unique_datatypes):
+    #         final_datatype = None
 
     # If there is a fill datatype, remove it to determine the datatype of remaining
     if len(unique_datatypes) == 1 and "isfill" in unique_datatypes:
@@ -1137,9 +1137,9 @@ def get_col_value_datatype(
         try:
             val_float = float(col_val)
 
-            if math.isnan(val_float):
-                datatype = "isnan"
-            elif "." not in col_val:
+            # if math.isnan(val_float):
+            #     datatype = "isnan"
+            if "." not in col_val:
                 datatype = "integer"
             else:
                 datatype = "float"
@@ -1228,7 +1228,8 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
             param_datetime_formats.append(datetime_formats)
 
             # Find fill value
-            if datatype is None or datatype == "isnan":
+            # if datatype is None or datatype == "isnan":
+            if datatype is None:
                 fills_obj["all_fill_values"].append(None)
                 fills_obj["all_possible_and_minus9s_fills"].append(None)
 
@@ -1504,13 +1505,6 @@ def main():
     files = Path(top_data_folder).glob("**/dataURL/*.csv")
 
     file_list = list(files)
-
-    file_list = [
-        file
-        for file in file_list
-        if file.name
-        == "644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv"
-    ]
 
     # TODO
     # Create Test files
