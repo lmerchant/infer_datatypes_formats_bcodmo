@@ -970,17 +970,18 @@ def infer_values_second_pass(
     final_results = {}
 
     for col_name in column_names:
-        fills_obj = get_final_fill_values(csv_file, col_name, results)
-
         col_values = results[col_name]["col_values"]
         formats = results[col_name]["col_formats"]
 
         final_results[col_name] = {}
         final_results[col_name]["col_values"] = col_values
 
-        final_results[col_name]["fill_value"] = fills_obj["fill_value"]
-
-        final_results[col_name]["alt_fill_value"] = fills_obj["alt_fill_val"]
+        # Get unique fill value
+        # a string datatype does not have a fill value because can't distinguish
+        # a fill value from a comment in a string column
+        fills_obj, dateime_has_multiple_fill_types = get_unique_parameter_fill_value(
+            csv_file, col_name, results
+        )
 
         # Find unique datatypes from looking at each parameter datatype and format
         # unique_datatypes may be None if the format for a value is None but has a datetime datatype
@@ -1051,6 +1052,27 @@ def infer_values_second_pass(
         final_format, final_datatype = check_datetime_format_and_datatype(
             col_values, final_format, final_datatype
         )
+
+        final_results[col_name]["fill_value"] = fills_obj["fill_value"]
+        final_results[col_name]["alt_fill_value"] = fills_obj["alt_fill_val"]
+
+        # Need to modify datatype and format for a datetime column if there are
+        # multiple types of fill values because it means the datetime values
+        # have strings or numbers that are not fills in the column and it's
+        # no longer a datetime datatype.
+
+        is_datetime = results[col_name]["is_datetime"]
+
+        if is_datetime and dateime_has_multiple_fill_types:
+            final_format = None
+            final_datatype = "string"
+
+        if is_datetime and fills_obj["alt_fill_val"]:
+            final_format = None
+            final_datatype = "string"
+
+        elif final_datatype != "string" and fills_obj["alt_fill_val"]:
+            final_datatype = "string"
 
         final_results[col_name]["final_format"] = final_format
         final_results[col_name]["final_datatype"] = final_datatype
@@ -1170,6 +1192,8 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
         string_values = []
         numeric_values = []
 
+        datetime_string_values = []
+
         fills_obj = {}
 
         fills_obj["found_possible_fill_values"] = []
@@ -1193,13 +1217,29 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
 
             parameter_datatypes.append(datatype)
 
+            # One value can have more than one datetime format that fits it
+            # Get possible datetime formats for each column value.
+            # Later on will fine tune a column datetime format
+            # from a unique set of the column value formats.
+            datetime_formats = get_col_val_datetime_formats(
+                col_val, is_name_in_bcodmo_datetime_vars
+            )
+
+            param_datetime_formats.append(datetime_formats)
+
             # Find fill value
             if datatype is None or datatype == "isnan":
                 fills_obj["all_fill_values"].append(None)
                 fills_obj["all_possible_and_minus9s_fills"].append(None)
 
             elif datatype == "datetime":
-                fills_obj = find_datetime_fill_values(col_val, fills_obj)
+                # Only looking for defined possible fill values or minus 9s values
+                # TODO
+                # Why not look for string values to determine if there is an alternate fill value?
+                # Don't need collect numeric values
+                (datetime_string_values, fills_obj) = find_datetime_fill_values(
+                    col_val, datetime_formats, datetime_string_values, fills_obj
+                )
 
             else:
                 (
@@ -1210,16 +1250,6 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
                     col_val, datatype, string_values, numeric_values, fills_obj
                 )
 
-            # One value can have more than one format that fits it
-            # Get possible datetime formats for each column value.
-            # Later on will fine tune a column datetime format
-            # from a unique set of the column value formats.
-            datetime_formats = get_col_val_datetime_formats(
-                col_val, is_name_in_bcodmo_datetime_vars
-            )
-
-            param_datetime_formats.append(datetime_formats)
-
         results[col_name]["col_values"] = col_vals
         results[col_name]["col_datatypes"] = parameter_datatypes
         results[col_name]["col_formats"] = param_datetime_formats
@@ -1227,6 +1257,7 @@ def infer_values_first_pass(df: pd.DataFrame, parameter_official_names: dict) ->
         results[col_name]["fills_obj"] = fills_obj
         results[col_name]["numeric_values"] = numeric_values
         results[col_name]["string_values"] = string_values
+        results[col_name]["datetime_string_values"] = datetime_string_values
 
     return results
 
@@ -1478,7 +1509,7 @@ def main():
         file
         for file in file_list
         if file.name
-        == "652223_v1_MUSiCC_OC1504A___Bacteria_Virus_and_Chlorophyll_Containing_Cell_Abundance.csv"
+        == "644840_v1_Cellular_element_quotas__Si_in_Synechococcus_cells.csv"
     ]
 
     # TODO
