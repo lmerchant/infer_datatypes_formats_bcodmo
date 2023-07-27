@@ -1,3 +1,4 @@
+# Skip %H%M%S since it conflicts with %m%d%y and %m%d%Y
 datetime_formats
 %A %B %d %Y
 %A %B %d %Y %I:%M:%S %p %Z
