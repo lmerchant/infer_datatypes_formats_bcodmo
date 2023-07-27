@@ -59,13 +59,6 @@ to determine positioning of the day and month values
 # https://stackoverflow.com/questions/53892450/get-the-format-in-dateutil-parse
 #
 
-# TODO
-# The program is slower in a Docker environment. To speed up, try the following
-
-# to speed up, see https://stackoverflow.com/questions/64370739/multiprocessing-pool-much-slower-than-manually-instantiating-multiple-processes
-
-# https://stackoverflow.com/questions/47989418/multiprocessing-python-program-inside-docker
-
 
 # --------------
 
@@ -81,13 +74,6 @@ to determine positioning of the day and month values
 #
 # If a datetime format has all NaNs, what is the output?
 #
-
-# TODO
-# if whole column is a 'fill' value, determine if it is a string, integer or float fill
-
-# TODO
-# modify so that NaN counts as a fill value
-# and if a column is entirely nan, set data type to None
 
 
 import os
@@ -1489,6 +1475,9 @@ def process_file(file: Path):
 
 
 def main():
+    # TODO
+    # Create Test files
+
     parameters_overview_path = Path(parameters_overview_file)
     parameters_overview_path.unlink(missing_ok=True)
 
@@ -1510,11 +1499,6 @@ def main():
     files = Path(top_data_folder).glob("**/dataURL/*.csv")
 
     file_list = list(files)
-
-    file_list = [file for file in file_list if file.name == "3911_v1_CTD_Profiles.csv"]
-
-    # TODO
-    # Create Test files
 
     num_files = len(file_list)
     print(f"Number of files to process is {num_files}")
