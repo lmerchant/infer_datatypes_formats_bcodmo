@@ -1,5 +1,7 @@
 """
-This program determines the datatype, datetime format, and fill value of parameters read in from a CSV data file. There are two files created. One is a log file, parameters_overview.txt, and the other is an output file, parameters_summary.json. The output file is an array of JSON objects of the form
+This program infers the datatype, datetime format, and fill value of parameters read in from a CSV data file.
+
+There are two files created. One is a log file, parameters_overview.txt, and the other is an output file, parameters_summary.json. The output file is an array of JSON objects of the form
 
 {
     "source": <full path of file>,
@@ -108,7 +110,7 @@ from get_fill_values import *
 
 # Set this to True if want to use program with just a subset of rows in files
 TESTING = False
-NUMBER_TESTING_ROWS = 10000
+NUMBER_TESTING_ROWS = 1000
 
 # Set names of folders and files used
 top_data_folder = f"../data"
@@ -122,7 +124,7 @@ log_no_results_file = "../logs/log_no_results_returned_files.txt"
 
 # Read in possible datetime formats globally so can access in mulitple program sections
 possible_formats_file = "possible_datetime_formats.txt"
-df_formats = pd.read_fwf(possible_formats_file)
+df_formats = pd.read_fwf(possible_formats_file, comment="#")
 datetime_formats_to_match = df_formats["datetime_formats"].tolist()
 
 # These are names of parameters to look for
@@ -1469,8 +1471,11 @@ def get_params_datatypes_formats_fill(csv_file: str) -> dict | None:
 def process_file(file: Path):
     csv_file = file.as_posix()
 
+    file_size = os.stat(csv_file)
+    kb_size = round(file_size.st_size / 1024, 3)
+
     print(f"\n******************\n")
-    print(f"File being processed is {csv_file}\n")
+    print(f"File being processed is {csv_file} size: {kb_size} KB\n")
 
     final_results = get_params_datatypes_formats_fill(csv_file)
 
@@ -1505,6 +1510,8 @@ def main():
     files = Path(top_data_folder).glob("**/dataURL/*.csv")
 
     file_list = list(files)
+
+    file_list = [file for file in file_list if file.name == "3911_v1_CTD_Profiles.csv"]
 
     # TODO
     # Create Test files
